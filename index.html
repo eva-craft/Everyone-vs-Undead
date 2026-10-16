@@ -1,0 +1,3071 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Everyone vs. Undead</title>
+    <style>
+        * { margin:0; padding:0; box-sizing:border-box; user-select:none; }
+        body {
+            background: #0b0d10;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            min-height: 100dvh;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            overflow: hidden;
+            flex-direction: column;
+            gap: 20px;
+        }
+        .game-wrapper {
+            background: #1a1f25;
+            padding: 12px;
+            border-radius: 28px;
+            box-shadow: 0 25px 40px rgba(0,0,0,0.8), inset 0 0 0 1px #3d4854;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            width: fit-content;
+            max-width: 98vw;
+            max-height: 98vh;
+            aspect-ratio: 1000 / 600;
+            position: relative;
+        }
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            border-radius: 20px;
+            box-shadow: inset 0 0 0 2px #2c3640, 0 0 0 2px #0f1216;
+            cursor: crosshair;
+            background: #1f2933;
+            aspect-ratio: 1000 / 600;
+            object-fit: contain;
+            image-rendering: auto;
+        }
+        .hud-top {
+            position: absolute;
+            top: 12px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 20px;
+            background: rgba(0,0,0,0.7);
+            padding: 6px 18px;
+            border-radius: 30px;
+            border: 1px solid #3a3a3a;
+            z-index: 15;
+            pointer-events: none;
+            color: #ddd;
+            font-size: 14px;
+            font-weight: 600;
+        }
+        .hud-top .gold { color: #ffdd44; }
+        .hud-top .gold span { font-size: 18px; }
+        .hud-top .mission { color: #88ddff; font-size: 12px; }
+        .spell-panel {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(0, 0, 0, 0.75);
+            padding: 8px 14px;
+            border-radius: 12px;
+            border: 2px solid #1a1a1a;
+            box-shadow: 0 0 20px rgba(0,0,0,0.9), inset 0 1px 0 rgba(255,255,255,0.08);
+            z-index: 20;
+            pointer-events: auto;
+            transition: opacity 0.3s ease;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        .spell-panel.hidden { opacity:0; pointer-events:none; }
+        .spell-btn {
+            position: relative;
+            width: 64px;
+            height: 64px;
+            background: #1a1a1a;
+            border: 2px solid #2a2a2a;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.1s ease;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.5);
+            padding: 0;
+            color: #fff;
+            font-size: 10px;
+            font-weight: 600;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+        }
+        .spell-btn .icon { font-size:26px; line-height:1; filter:drop-shadow(0 2px 4px rgba(0,0,0,0.6)); }
+        .spell-btn .keybind { position:absolute; top:2px; left:4px; font-size:9px; color:#888; opacity:0.7; }
+        .spell-btn .cost-badge {
+            position:absolute; bottom:2px; right:4px;
+            font-size:9px; color:#ffdd44;
+            background:rgba(0,0,0,0.6); padding:0 4px; border-radius:2px;
+        }
+        .spell-btn .cooldown-overlay {
+            position:absolute; top:0; left:0; width:100%; height:100%;
+            background:rgba(0,0,0,0.7); border-radius:7px;
+            display:flex; align-items:center; justify-content:center;
+            font-size:18px; font-weight:700; color:#ff8844;
+            text-shadow:0 0 12px rgba(255,136,68,0.4);
+            pointer-events:none; opacity:0; transition:opacity 0.2s;
+        }
+        .spell-btn .cooldown-overlay.active { opacity:1; }
+        .spell-btn:hover { border-color:#5a5a5a; box-shadow:inset 0 0 10px rgba(255,255,255,0.05),0 0 12px rgba(255,255,255,0.05); }
+        .spell-btn:active { transform:scale(0.94); }
+        .spell-btn:disabled { opacity:0.5; cursor:default; transform:none; }
+        .spell-btn .tooltip {
+            display:none; position:absolute; bottom:70px; left:50%; transform:translateX(-50%);
+            background:rgba(0,0,0,0.92); border:1px solid #3a3a3a; border-radius:6px;
+            padding:6px 12px; white-space:nowrap; color:#ddd; font-size:11px;
+            pointer-events:none; box-shadow:0 4px 20px rgba(0,0,0,0.8); z-index:30;
+        }
+        .spell-btn .tooltip .name { color:#ffdd88; font-weight:600; font-size:12px; }
+        .spell-btn .tooltip .desc { color:#aaa; font-size:10px; }
+        .spell-btn .tooltip .cost { color:#ffdd44; font-size:10px; }
+        .spell-btn:hover .tooltip { display:block; }
+        .spell-btn .border-glow {
+            position:absolute; top:-2px; left:-2px; right:-2px; bottom:-2px;
+            border-radius:9px; border:2px solid transparent; pointer-events:none;
+            transition:border-color 0.2s;
+        }
+        .spell-btn.ready .border-glow { border-color:rgba(255,200,100,0.3); }
+        .spell-btn.ready:hover .border-glow { border-color:rgba(255,200,100,0.7); }
+
+        .target-info {
+            position:absolute; top:56px; right:20px;
+            background:rgba(0,0,0,0.75); border:1px solid #2a2a2a; border-radius:6px;
+            padding:6px 12px; color:#ccc; font-size:12px; z-index:15;
+            pointer-events:none; min-width:100px; text-align:right;
+            box-shadow:0 4px 16px rgba(0,0,0,0.6); display:none;
+        }
+        .target-info .target-name { color:#ffdd88; font-weight:600; font-size:13px; }
+        .target-info .target-hp { color:#88dd88; font-size:12px; }
+        .target-info .target-hp.low { color:#ff6644; }
+        .target-info.visible { display:block; }
+        .target-portrait {
+            position:absolute; top:56px; right:160px;
+            width:40px; height:40px; background:#0a0a0a; border:2px solid #2a2a2a;
+            border-radius:4px; z-index:15; pointer-events:none;
+            display:none; align-items:center; justify-content:center;
+            font-size:24px; box-shadow:0 4px 16px rgba(0,0,0,0.6);
+        }
+        .target-portrait.visible { display:flex; }
+
+        .castle-hud {
+            position:absolute; top:56px; left:20px;
+            background:rgba(0,0,0,0.75); border:1px solid #2a2a2a; border-radius:6px;
+            padding:6px 12px; color:#ccc; font-size:12px; z-index:15;
+            pointer-events:none; min-width:90px; text-align:left;
+            box-shadow:0 4px 16px rgba(0,0,0,0.6); display:none;
+        }
+        .castle-hud.visible { display:block; }
+        .castle-hud .castle-name { color:#ffdd88; font-weight:600; font-size:13px; }
+        .castle-hud .castle-hp { color:#88dd88; font-size:12px; }
+        .castle-hud .castle-hp.low { color:#ff6644; }
+
+        .mission-info {
+            position:absolute; top:56px; left:50%; transform:translateX(-50%);
+            background:rgba(0,0,0,0.8); border:1px solid #3a5a6a; border-radius:8px;
+            padding:6px 16px; color:#cce; font-size:12px; z-index:15;
+            pointer-events:none; text-align:center; min-width:200px;
+            box-shadow:0 4px 16px rgba(0,0,0,0.6); display:none;
+        }
+        .mission-info.visible { display:block; }
+        .mission-info .title { color:#88ddff; font-weight:600; font-size:13px; }
+        .mission-info .progress { color:#aadd88; font-size:12px; }
+        .mission-info .progress.done { color:#88dd88; }
+        .mission-info .fail-condition { color:#ff8866; font-size:11px; margin-top:2px; }
+
+        .level-menu {
+            position:absolute; top:0; left:0; width:100%; height:100%;
+            background:rgba(10,14,19,0.92); backdrop-filter:blur(4px); border-radius:20px;
+            display:flex; flex-direction:column; justify-content:center; align-items:center;
+            gap:12px; z-index:10; padding:20px; box-sizing:border-box;
+            overflow-y:auto;
+        }
+        .level-menu h1 {
+            color:#c9d4df; font-weight:300; letter-spacing:4px; text-transform:uppercase;
+            font-size:clamp(1.2rem,3vw,2.2rem); text-shadow:0 0 20px #1f3a4a;
+            margin-bottom:4px; border-bottom:1px solid #3d4d5a; padding-bottom:10px;
+            width:80%; text-align:center;
+        }
+        .level-menu .sub { color:#6a7d8a; font-size:clamp(0.7rem,1.2vw,1rem); margin-bottom:4px; letter-spacing:2px; }
+        .level-grid {
+            display:grid; grid-template-columns:repeat(auto-fit, minmax(200px,1fr));
+            gap:12px; width:92%; max-width:800px; margin:4px 0;
+            max-height:60vh; overflow-y:auto; padding:4px;
+        }
+        .level-btn {
+            background:#202b33; border:2px solid #2f3e48; border-radius:14px;
+            padding:12px 10px; color:#d4dfe8; font-size:clamp(0.8rem,1.1vw,1rem);
+            font-weight:500; cursor:pointer; transition:all 0.15s ease;
+            box-shadow:0 4px 0 #0f1419; text-align:center; letter-spacing:0.3px;
+            display:flex; flex-direction:column; gap:2px;
+        }
+        .level-btn small { font-weight:300; font-size:0.7em; color:#8a9aa8; }
+        .level-btn .icon { font-size:1.6em; }
+        .level-btn .goal { color:#88dd88; font-size:0.7em; background:#141d24; padding:2px 8px; border-radius:20px; display:inline-block; margin-top:4px; }
+        .level-btn .fail { color:#ff8866; font-size:0.65em; }
+        .level-btn.locked { opacity:0.5; cursor:not-allowed; }
+        .level-btn.locked:hover { transform:none; box-shadow:0 4px 0 #0f1419; border-color:#2f3e48; background:#202b33; }
+        .level-btn:hover:not(.locked) { background:#2d3b45; border-color:#4d6575; transform:translateY(-2px); box-shadow:0 6px 0 #0f1419; }
+        .level-btn:active:not(.locked) { transform:translateY(4px); box-shadow:0 2px 0 #0f1419; }
+        .level-btn .completed { color:#88dd88; font-size:1.2em; }
+        .level-btn .locked-icon { color:#ff6644; font-size:1.2em; }
+
+        .game-over {
+            position:absolute; top:0; left:0; width:100%; height:100%;
+            background:rgba(10,0,0,0.85); backdrop-filter:blur(4px); border-radius:20px;
+            display:none; flex-direction:column; justify-content:center; align-items:center;
+            gap:20px; z-index:30; padding:20px; box-sizing:border-box;
+        }
+        .game-over h1 { color:#ff4444; font-weight:700; font-size:clamp(2rem,5vw,3.5rem); text-shadow:0 0 40px #ff000066; letter-spacing:6px; }
+        .game-over .sub { color:#cc8888; font-size:clamp(1rem,2vw,1.4rem); }
+        .game-over .restart-btn {
+            background:#2a1a1a; border:2px solid #5a3a3a; border-radius:12px;
+            padding:14px 40px; color:#ffdddd; font-size:1.2rem; cursor:pointer;
+            transition:0.15s; margin-top:10px;
+        }
+        .game-over .restart-btn:hover { background:#3a2a2a; border-color:#8a5a5a; transform:scale(1.05); }
+
+        .victory {
+            position:absolute; top:0; left:0; width:100%; height:100%;
+            background:rgba(10,20,10,0.85); backdrop-filter:blur(4px); border-radius:20px;
+            display:none; flex-direction:column; justify-content:center; align-items:center;
+            gap:20px; z-index:30; padding:20px; box-sizing:border-box;
+        }
+        .victory h1 { color:#88dd88; font-weight:700; font-size:clamp(2rem,5vw,3.5rem); text-shadow:0 0 40px #44ff4466; letter-spacing:6px; }
+        .victory .sub { color:#88cc88; font-size:clamp(1rem,2vw,1.4rem); }
+        .victory .restart-btn {
+            background:#1a2a1a; border:2px solid #4a8a4a; border-radius:12px;
+            padding:14px 40px; color:#ddffdd; font-size:1.2rem; cursor:pointer;
+            transition:0.15s; margin-top:10px;
+        }
+        .victory .restart-btn:hover { background:#2a3a2a; border-color:#6aaa6a; transform:scale(1.05); }
+
+        @media (max-width:720px) {
+            .game-wrapper { padding:6px; border-radius:18px; }
+            .level-grid { grid-template-columns:1fr 1fr; gap:8px; }
+            .spell-panel { bottom:10px; padding:6px 10px; gap:4px; }
+            .spell-btn { width:50px; height:50px; }
+            .spell-btn .icon { font-size:20px; }
+            .spell-btn .keybind { display:none; }
+            .spell-btn .cost-badge { font-size:7px; }
+            .hud-top { font-size:11px; padding:4px 12px; gap:12px; }
+            .mission-info { font-size:10px; min-width:140px; top:52px; padding:4px 10px; }
+            .target-info { font-size:10px; right:10px; top:52px; padding:4px 10px; min-width:70px; display:none !important; }
+            .target-portrait { display:none !important; }
+            .castle-hud { font-size:10px; left:10px; top:52px; padding:4px 10px; min-width:60px; }
+        }
+        @media (max-width:480px) {
+            .game-wrapper { padding:4px; border-radius:12px; }
+            .level-grid { grid-template-columns:1fr; gap:6px; }
+            .level-btn { padding:10px 6px; }
+            .spell-panel { bottom:6px; padding:4px 6px; gap:3px; }
+            .spell-btn { width:42px; height:42px; }
+            .spell-btn .icon { font-size:16px; }
+            .spell-btn .cost-badge { display:none; }
+            .spell-btn .cooldown-overlay { font-size:12px; }
+            .hud-top { font-size:10px; padding:2px 10px; gap:8px; top:8px; }
+            .hud-top .gold span { font-size:14px; }
+            .mission-info { display:none !important; }
+            .target-info { display:none !important; }
+            .target-portrait { display:none !important; }
+            .castle-hud { display:none !important; }
+        }
+    </style>
+</head>
+<body>
+<div class="game-wrapper" id="gameWrapper">
+    <canvas id="gameCanvas" width="1000" height="600"></canvas>
+
+    <div class="hud-top" id="hudTop">
+        <div class="gold">🪙 <span id="goldDisplay">50</span></div>
+        <div>👥 <span id="allyCount">0</span></div>
+        <div class="mission" id="missionCounter">🎯 <span id="missionProgress">0/0</span></div>
+    </div>
+
+    <div class="spell-panel hidden" id="spellPanel"></div>
+
+    <div class="mission-info" id="missionInfo">
+        <div class="title" id="missionTitle">Миссия</div>
+        <div class="progress" id="missionProgressText">Прогресс: 0/0</div>
+        <div class="fail-condition" id="missionFailCondition"></div>
+    </div>
+
+    <div class="target-info" id="targetInfo">
+        <div class="target-name" id="targetName">—</div>
+        <div class="target-hp" id="targetHp">HP: —</div>
+    </div>
+    <div class="target-portrait" id="targetPortrait">👹</div>
+
+    <div class="castle-hud" id="castleHud">
+        <div class="castle-name">🏰 Замок</div>
+        <div class="castle-hp" id="castleHp">HP: 30/30</div>
+    </div>
+
+    <div class="level-menu" id="levelMenu">
+        <h1>⚰️ Некро-RTS</h1>
+        <div class="sub">— кампания против нежити —</div>
+        <div class="level-grid" id="levelGrid"></div>
+        <div style="color:#4a5c68; font-size:0.7rem; margin-top:4px; opacity:0.7;">выполняйте задания, чтобы открывать новые уровни</div>
+    </div>
+
+    <div class="game-over" id="gameOver">
+        <h1>💀 ПОРАЖЕНИЕ</h1>
+        <div class="sub" id="gameOverReason">Ваши войска пали...</div>
+        <div class="restart-btn" id="restartBtn">🔄 Попробовать снова</div>
+    </div>
+
+    <div class="victory" id="victory">
+        <h1>🏆 ПОБЕДА</h1>
+        <div class="sub" id="victoryMessage">Задание выполнено!</div>
+        <div class="restart-btn" id="victoryRestartBtn">➡️ Следующий уровень</div>
+    </div>
+</div>
+
+<script>
+(function() {
+    // ===== ПОЛИФИЛЛ ДЛЯ roundRect =====
+    if (!CanvasRenderingContext2D.prototype.roundRect) {
+        CanvasRenderingContext2D.prototype.roundRect = function(x, y, w, h, radii) {
+            var r;
+            if (typeof radii === 'number') {
+                r = radii;
+            } else if (Array.isArray(radii) && radii.length) {
+                r = radii[0] || 0;
+            } else {
+                r = 0;
+            }
+            r = Math.min(r, Math.min(w, h) / 2);
+            this.moveTo(x + r, y);
+            this.arcTo(x + w, y, x + w, y + h, r);
+            this.arcTo(x + w, y + h, x, y + h, r);
+            this.arcTo(x, y + h, x, y, r);
+            this.arcTo(x, y, x + w, y, r);
+            return this;
+        };
+    }
+
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const levelMenu = document.getElementById('levelMenu');
+    const levelGrid = document.getElementById('levelGrid');
+    const spellPanel = document.getElementById('spellPanel');
+    const targetInfo = document.getElementById('targetInfo');
+    const targetName = document.getElementById('targetName');
+    const targetHp = document.getElementById('targetHp');
+    const targetPortrait = document.getElementById('targetPortrait');
+    const castleHud = document.getElementById('castleHud');
+    const castleHpEl = document.getElementById('castleHp');
+    const gameOverEl = document.getElementById('gameOver');
+    const gameOverReason = document.getElementById('gameOverReason');
+    const victoryEl = document.getElementById('victory');
+    const victoryMessage = document.getElementById('victoryMessage');
+    const restartBtn = document.getElementById('restartBtn');
+    const victoryRestartBtn = document.getElementById('victoryRestartBtn');
+    const goldDisplay = document.getElementById('goldDisplay');
+    const allyCountEl = document.getElementById('allyCount');
+    const missionInfo = document.getElementById('missionInfo');
+    const missionTitle = document.getElementById('missionTitle');
+    const missionProgressText = document.getElementById('missionProgressText');
+    const missionFailCondition = document.getElementById('missionFailCondition');
+    const missionCounter = document.getElementById('missionCounter');
+    const missionProgressEl = document.getElementById('missionProgress');
+
+    // ---- КАМПАНИЯ ----
+    const CAMPAIGN = {
+        'forest_graves': {
+            id: 'forest_graves',
+            name: 'Могильный лес',
+            icon: '🌲',
+            description: 'Очистите лес от скелетов',
+            enemies: ['skeleton'],
+            enemyCount: 3,
+            initialGold: 30,
+            castleHP: 20,
+            failCondition: 'Не дайте скелетам уничтожить замок',
+            spawnRate: 5000,
+            maxEnemies: 4,
+            mission: { type: 'kill_enemies', target: 3, enemyTypes: ['skeleton'] },
+            unlock: null,
+            next: 'vampire_county'
+        },
+        'vampire_county': {
+            id: 'vampire_county',
+            name: 'Графство Ужаса',
+            icon: '🦇',
+            description: 'Наймите 2 мечников и убейте 4 вампиров',
+            enemies: ['vampire'],
+            enemyCount: 4,
+            initialGold: 60,
+            castleHP: 25,
+            failCondition: 'Замок не должен быть разрушен',
+            spawnRate: 4500,
+            maxEnemies: 5,
+            mission: { type: 'hire_and_kill', hire: { swordsman: 2 }, kill: { vampire: 4 } },
+            unlock: 'forest_graves',
+            next: 'blood_moon'
+        },
+        'blood_moon': {
+            id: 'blood_moon',
+            name: 'Кровавая Луна',
+            icon: '🐺',
+            description: 'Наймите 3 мечников и 2 гномов-снайперов',
+            enemies: ['werewolf'],
+            enemyCount: 5,
+            initialGold: 80,
+            castleHP: 30,
+            failCondition: 'Оборотни не должны уничтожить замок',
+            spawnRate: 4000,
+            maxEnemies: 5,
+            mission: { type: 'hire_units', hire: { swordsman: 3, sniper: 2 } },
+            unlock: 'vampire_county',
+            next: 'crusade'
+        },
+        'crusade': {
+            id: 'crusade',
+            name: 'Крестовый Поход',
+            icon: '⚔️',
+            description: 'Наймите 10 епископов для крестового похода',
+            enemies: ['vampire', 'zombie', 'werewolf', 'skeleton'],
+            enemyCount: 8,
+            initialGold: 150,
+            castleHP: 40,
+            failCondition: 'Замок должен выстоять',
+            spawnRate: 3500,
+            maxEnemies: 8,
+            mission: { type: 'hire_units', hire: { bishop: 10 } },
+            unlock: 'blood_moon',
+            next: null
+        }
+    };
+
+    // ---- ДОПОЛНИТЕЛЬНЫЕ УРОВНИ (ещё 9) ----
+    const EXTRA_LEVELS = [
+        {
+            id: 'skeleton_horde',
+            name: 'Орда Скелетов',
+            icon: '💀',
+            description: 'Убейте 10 скелетов',
+            enemies: ['skeleton'],
+            enemyCount: 10,
+            initialGold: 40,
+            castleHP: 25,
+            failCondition: 'Замок не должен пасть',
+            spawnRate: 3000,
+            maxEnemies: 6,
+            mission: { type: 'kill_enemies', target: 10, enemyTypes: ['skeleton'] },
+            unlock: 'forest_graves',
+            next: null
+        },
+        {
+            id: 'vampire_nest',
+            name: 'Гнездо Вампиров',
+            icon: '🧛',
+            description: 'Убейте 6 вампиров и наймите 3 епископов',
+            enemies: ['vampire'],
+            enemyCount: 6,
+            initialGold: 70,
+            castleHP: 30,
+            failCondition: 'Вампиры не должны уничтожить замок',
+            spawnRate: 4000,
+            maxEnemies: 5,
+            mission: { type: 'hire_and_kill', hire: { bishop: 3 }, kill: { vampire: 6 } },
+            unlock: 'vampire_county',
+            next: null
+        },
+        {
+            id: 'werewolf_pack',
+            name: 'Стая Оборотней',
+            icon: '🌕',
+            description: 'Убейте 8 оборотней',
+            enemies: ['werewolf'],
+            enemyCount: 8,
+            initialGold: 60,
+            castleHP: 35,
+            failCondition: 'Замок должен устоять',
+            spawnRate: 3500,
+            maxEnemies: 6,
+            mission: { type: 'kill_enemies', target: 8, enemyTypes: ['werewolf'] },
+            unlock: 'blood_moon',
+            next: null
+        },
+        {
+            id: 'ghost_manor',
+            name: 'Призрачный Особняк',
+            icon: '👻',
+            description: 'Убейте 5 призраков',
+            enemies: ['ghost'],
+            enemyCount: 5,
+            initialGold: 50,
+            castleHP: 25,
+            failCondition: 'Призраки не должны уничтожить замок',
+            spawnRate: 4500,
+            maxEnemies: 5,
+            mission: { type: 'kill_enemies', target: 5, enemyTypes: ['ghost'] },
+            unlock: 'forest_graves',
+            next: null
+        },
+        {
+            id: 'undead_army',
+            name: 'Армия Нежити',
+            icon: '🧟',
+            description: 'Убейте 12 врагов любого типа',
+            enemies: ['zombie', 'skeleton', 'ghost'],
+            enemyCount: 12,
+            initialGold: 90,
+            castleHP: 35,
+            failCondition: 'Замок не должен быть разрушен',
+            spawnRate: 3000,
+            maxEnemies: 8,
+            mission: { type: 'kill_enemies', target: 12, enemyTypes: ['zombie', 'skeleton', 'ghost'] },
+            unlock: 'crusade',
+            next: null
+        },
+        {
+            id: 'dark_castle',
+            name: 'Тёмный Замок',
+            icon: '🏰',
+            description: 'Наймите 5 мечников и 3 епископов',
+            enemies: ['vampire', 'werewolf'],
+            enemyCount: 6,
+            initialGold: 100,
+            castleHP: 40,
+            failCondition: 'Замок должен выстоять',
+            spawnRate: 3800,
+            maxEnemies: 6,
+            mission: { type: 'hire_units', hire: { swordsman: 5, bishop: 3 } },
+            unlock: 'crusade',
+            next: null
+        },
+        {
+            id: 'plague_lands',
+            name: 'Чумные Земли',
+            icon: '☠️',
+            description: 'Убейте 7 зомби и наймите 4 гномов-снайперов',
+            enemies: ['zombie'],
+            enemyCount: 7,
+            initialGold: 80,
+            castleHP: 30,
+            failCondition: 'Зомби не должны уничтожить замок',
+            spawnRate: 3500,
+            maxEnemies: 6,
+            mission: { type: 'hire_and_kill', hire: { sniper: 4 }, kill: { zombie: 7 } },
+            unlock: 'undead_army',
+            next: null
+        },
+        {
+            id: 'cursed_forest',
+            name: 'Проклятый Лес',
+            icon: '🌳',
+            description: 'Убейте 9 врагов и наймите 5 епископов',
+            enemies: ['werewolf', 'ghost', 'skeleton'],
+            enemyCount: 9,
+            initialGold: 110,
+            castleHP: 35,
+            failCondition: 'Замок не должен пасть',
+            spawnRate: 3200,
+            maxEnemies: 7,
+            mission: { type: 'hire_and_kill', hire: { bishop: 5 }, kill: { total: 9 } },
+            unlock: 'dark_castle',
+            next: null
+        },
+        {
+            id: 'final_battle',
+            name: 'Финальная Битва',
+            icon: '🔥',
+            description: 'Убейте 15 врагов любых типов',
+            enemies: ['vampire', 'zombie', 'werewolf', 'skeleton', 'ghost'],
+            enemyCount: 15,
+            initialGold: 130,
+            castleHP: 50,
+            failCondition: 'Замок должен устоять в финальной битве',
+            spawnRate: 2800,
+            maxEnemies: 10,
+            mission: { type: 'kill_enemies', target: 15, enemyTypes: ['vampire', 'zombie', 'werewolf', 'skeleton', 'ghost'] },
+            unlock: 'cursed_forest',
+            next: null
+        }
+    ];
+
+    // Объединяем все уровни
+    const ALL_LEVELS = { ...CAMPAIGN };
+    EXTRA_LEVELS.forEach(l => { ALL_LEVELS[l.id] = l; });
+
+    // ---- Состояние игры ----
+    let currentLevelId = null;
+    let currentLevelData = null;
+    let enemies = [];
+    let allies = [];
+    let allUnits = [];
+    let obstacles = [];
+    let gameStarted = false;
+    let gameOverFlag = false;
+    let victoryFlag = false;
+    let spawnIntervalId = null;
+    let cleanIntervalId = null;
+    let selectedUnit = null;
+    let gold = 50;
+    let castleHP = 30;
+    const CASTLE_MAX_HP = 30;
+    const CASTLE_X = 880;
+    const CASTLE_Y = 300;
+    const CASTLE_RADIUS = 45;
+    let enemyCampHP = 20;
+    const ENEMY_CAMP_MAX_HP = 20;
+
+    // ---- Прогресс миссии ----
+    let missionProgress = { kills: 0, hired: {} };
+    let missionCompleted = false;
+    let completedLevels = new Set();
+    let currentMissionType = null;
+    let currentMissionData = null;
+
+    let cooldowns = {};
+    let COOLDOWN_MAX = {};
+    let spellConfigs = [];
+    let animations = [];
+
+    // ---- КОНФИГУРАЦИЯ УРОВНЕЙ (для врагов и препятствий) ----
+    function getLevelConfig(levelId) {
+        const data = ALL_LEVELS[levelId];
+        if (!data) return null;
+
+        // Определяем тип врага (первый из списка или по умолчанию)
+        let enemyType = 'zombie';
+        if (data.enemies && data.enemies.length > 0) {
+            enemyType = data.enemies[0];
+        }
+
+        // Препятствия в зависимости от уровня
+        let obstaclesConfig = [];
+        let bg = 'zombie';
+        let campX = 120, campY = 300, campRadius = 100;
+
+        // Настраиваем фон и препятствия
+        if (levelId === 'forest_graves' || levelId === 'skeleton_horde') {
+            bg = 'zombie';
+            obstaclesConfig = [
+                { x: 20, y: 100, w: 60, h: 40, type: 'grave' },
+                { x: 15, y: 430, w: 70, h: 50, type: 'tomb' },
+                { x: 250, y: 180, w: 50, h: 60, type: 'grave' },
+                { x: 260, y: 420, w: 60, h: 50, type: 'tomb' },
+                { x: 60, y: 520, w: 80, h: 40, type: 'grave' },
+                { x: 220, y: 90, w: 50, h: 70, type: 'tomb' }
+            ];
+        } else if (levelId === 'vampire_county' || levelId === 'vampire_nest' || levelId === 'dark_castle') {
+            bg = 'castle';
+            obstaclesConfig = [
+                { x: 20, y: 120, w: 40, h: 80, type: 'tower' },
+                { x: 280, y: 150, w: 80, h: 40, type: 'wall' },
+                { x: 20, y: 440, w: 80, h: 40, type: 'wall' },
+                { x: 290, y: 400, w: 40, h: 80, type: 'tower' },
+                { x: 60, y: 540, w: 60, h: 40, type: 'wall' },
+                { x: 250, y: 530, w: 60, h: 40, type: 'wall' }
+            ];
+        } else if (levelId === 'blood_moon' || levelId === 'werewolf_pack' || levelId === 'cursed_forest') {
+            bg = 'forest';
+            obstaclesConfig = [
+                { x: 10, y: 80, w: 60, h: 60, type: 'tree' },
+                { x: 280, y: 100, w: 70, h: 70, type: 'tree' },
+                { x: 10, y: 450, w: 60, h: 60, type: 'tree' },
+                { x: 270, y: 470, w: 70, h: 70, type: 'tree' },
+                { x: 50, y: 530, w: 60, h: 60, type: 'tree' },
+                { x: 300, y: 520, w: 60, h: 60, type: 'tree' }
+            ];
+        } else if (levelId === 'ghost_manor') {
+            bg = 'crypt';
+            obstaclesConfig = [
+                { x: 10, y: 80, w: 60, h: 60, type: 'crypt' },
+                { x: 260, y: 80, w: 60, h: 60, type: 'crypt' },
+                { x: 10, y: 450, w: 70, h: 60, type: 'crypt' },
+                { x: 270, y: 450, w: 60, h: 70, type: 'crypt' },
+                { x: 40, y: 530, w: 70, h: 50, type: 'crypt' },
+                { x: 240, y: 530, w: 60, h: 60, type: 'crypt' }
+            ];
+        } else {
+            // generic
+            bg = 'zombie';
+            obstaclesConfig = [
+                { x: 50, y: 100, w: 60, h: 40, type: 'grave' },
+                { x: 50, y: 450, w: 70, h: 50, type: 'tomb' },
+                { x: 250, y: 200, w: 50, h: 60, type: 'grave' }
+            ];
+        }
+
+        return {
+            maxUnits: data.maxEnemies || 6,
+            initialCount: Math.min(data.enemyCount || 3, data.maxEnemies || 6),
+            allowedTypes: data.enemies || ['zombie'],
+            campX: campX,
+            campY: campY,
+            campRadius: campRadius,
+            spawnRate: data.spawnRate || 4000,
+            obstacles: obstaclesConfig,
+            bg: bg,
+            mission: data.mission,
+            failCondition: data.failCondition || 'Не дайте врагам уничтожить замок'
+        };
+    }
+
+    // ---- Класс Unit ----
+    class Unit {
+        constructor(x, y, type, campX, campY, isAlly = false) {
+            this.x = x;
+            this.y = y;
+            this.type = type;
+            this.hp = isAlly ? 12 : 10;
+            this.maxHp = this.hp;
+            this.radius = 22;
+            this.portrait = this.getPortrait();
+            this.campX = campX;
+            this.campY = campY;
+            this.state = 'idle';
+            this.targetX = x;
+            this.targetY = y;
+            this.speed = 0.6 + Math.random() * 0.4;
+            this.phase = Math.random() * 100;
+            this.ghostFlicker = 0.7 + Math.random() * 0.3;
+            this.walkCycle = 0;
+            this.facing = 1;
+            this.attackTimer = 0;
+            this.vx = 0;
+            this.vy = 0;
+            this.isAlly = isAlly;
+            this.rootTimer = 0;
+            this.isRooted = false;
+            // УМЕНЬШЕНА ДАЛЬНОСТЬ СНАЙПЕРА С 300 ДО 150
+            this.range = isAlly && type === 'sniper' ? 150 : 40;
+            this.attackCooldown = 0;
+            this.attackSpeed = 25;
+            this.damage = isAlly ? (type === 'swordsman' ? 4 : type === 'sniper' ? 3 : type === 'bishop' ? 2 : 2) : 1;
+            this.marchTargetX = campX;
+            this.marchTargetY = campY;
+            this.reachedCamp = false;
+            this.attackAnim = 0;
+            this.hitAnim = 0;
+            this.bullets = [];
+            this.deathTimer = 0;
+            this.isDead = false;
+            this.stuckCounter = 0;
+            this.lastX = x;
+            this.lastY = y;
+            this.isEngaged = false;
+            this.engagedTarget = null;
+            // Флаг для самоубийственной атаки на лагерь
+            this.suicideOnCamp = false;
+            // Для скелетов
+            if (type === 'skeleton') {
+                this.hp = 8;
+                this.maxHp = 8;
+                this.speed = 0.5 + Math.random() * 0.3;
+                this.damage = 1;
+            }
+        }
+
+        getPortrait() {
+            const map = {
+                'zombie':'🧟', 'werewolf':'🐺', 'vampire':'🦇', 'ghost':'👻',
+                'skeleton':'💀',
+                'swordsman':'⚔️', 'sniper':'🔫', 'bishop':'⛪', 'druid':'🌿'
+            };
+            return map[this.type] || '👹';
+        }
+
+        getTypeName() {
+            const map = {
+                'zombie':'Зомби', 'werewolf':'Вервольф', 'vampire':'Вампир',
+                'ghost':'Призрак', 'skeleton':'Скелет',
+                'swordsman':'Мечник', 'sniper':'Гном-снайпер',
+                'bishop':'Епископ', 'druid':'Друид'
+            };
+            return map[this.type] || this.type;
+        }
+
+        findTarget() {
+            if (this.isEngaged && this.engagedTarget && this.engagedTarget.hp > 0) {
+                return this.engagedTarget;
+            }
+            
+            if (this.isEngaged) {
+                this.isEngaged = false;
+                this.engagedTarget = null;
+            }
+
+            if (this.isAlly) {
+                let nearest = null;
+                let nearDist = Infinity;
+                for (const e of enemies) {
+                    if (e.hp <= 0) continue;
+                    const d = Math.hypot(e.x - this.x, e.y - this.y);
+                    if (d < nearDist) { nearDist = d; nearest = e; }
+                }
+                if (!nearest && currentLevelData) {
+                    const cfg = getLevelConfig(currentLevelId);
+                    if (cfg) return { x: cfg.campX, y: cfg.campY, isCamp: true };
+                }
+                return nearest;
+            } else {
+                let nearest = null;
+                let nearDist = Infinity;
+                for (const a of allies) {
+                    if (a.hp <= 0) continue;
+                    const d = Math.hypot(a.x - this.x, a.y - this.y);
+                    if (d < nearDist) { nearDist = d; nearest = a; }
+                }
+                if (!nearest) return { x: CASTLE_X, y: CASTLE_Y, isCastle: true };
+                return nearest;
+            }
+        }
+
+        avoidUnits() {
+            const minDist = 30;
+            let ax = 0, ay = 0;
+            let count = 0;
+            for (const other of allUnits) {
+                if (other === this || other.isDead) continue;
+                const dx = this.x - other.x;
+                const dy = this.y - other.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                const totalRadius = this.radius + other.radius;
+                const effectiveDist = Math.max(minDist, totalRadius);
+                if (dist < effectiveDist && dist > 0.01) {
+                    const push = (effectiveDist - dist) / dist * 1.5;
+                    ax += dx * push;
+                    ay += dy * push;
+                    count++;
+                }
+            }
+            if (count > 0) {
+                const randomStrength = 0.3;
+                this.vx += (ax / count) * 0.6 + (Math.random() - 0.5) * randomStrength;
+                this.vy += (ay / count) * 0.6 + (Math.random() - 0.5) * randomStrength;
+            }
+        }
+
+        avoidObstacles() {
+            const margin = 25;
+            for (const obs of obstacles) {
+                const cx = obs.x + obs.w / 2;
+                const cy = obs.y + obs.h / 2;
+                const dx = this.x - cx;
+                const dy = this.y - cy;
+                const halfW = obs.w / 2 + margin;
+                const halfH = obs.h / 2 + margin;
+
+                if (Math.abs(dx) < halfW && Math.abs(dy) < halfH) {
+                    const overlapX = halfW - Math.abs(dx);
+                    const overlapY = halfH - Math.abs(dy);
+                    
+                    if (overlapX < overlapY) {
+                        this.x += (dx > 0 ? 1 : -1) * overlapX * 0.8;
+                        this.vx = (dx > 0 ? 1 : -1) * Math.abs(this.vx) * 0.3;
+                    } else {
+                        this.y += (dy > 0 ? 1 : -1) * overlapY * 0.8;
+                        this.vy = (dy > 0 ? 1 : -1) * Math.abs(this.vy) * 0.3;
+                    }
+                }
+            }
+        }
+
+        // НОВЫЙ МЕТОД: самоубийственная атака на лагерь
+        suicideAttackCamp() {
+            if (!currentLevelData || !this.isAlly) return;
+            const cfg = getLevelConfig(currentLevelId);
+            if (!cfg) return;
+            const dx = cfg.campX - this.x;
+            const dy = cfg.campY - this.y;
+            const dist = Math.hypot(dx, dy);
+
+            // Если юнит дошёл до лагеря
+            if (dist < 45 && enemyCampHP > 0) {
+                // Наносим урон лагерю
+                enemyCampHP = Math.max(0, enemyCampHP - 3);
+                addAnimation(this.x, this.y - 30, 'camp_damage', '#ff4444');
+                addAnimation(this.x, this.y, 'explosion', '#ff6600');
+                
+                // Юнит погибает
+                this.hp = 0;
+                this.isDead = true;
+                
+                if (enemyCampHP <= 0) {
+                    checkMission();
+                }
+                return true;
+            }
+            return false;
+        }
+
+        update(width, height) {
+            this.walkCycle += 0.05;
+            if (this.attackCooldown > 0) this.attackCooldown--;
+            if (this.rootTimer > 0) this.rootTimer--;
+            else this.isRooted = false;
+            if (this.attackAnim > 0) this.attackAnim--;
+            if (this.hitAnim > 0) this.hitAnim--;
+
+            this.bullets = this.bullets.filter(b => {
+                b.x += b.vx;
+                b.y += b.vy;
+                b.life--;
+                if (b.target && b.target.hp > 0) {
+                    const d = Math.hypot(b.x - b.target.x, b.y - b.target.y);
+                    if (d < 25) {
+                        return false;
+                    }
+                }
+                return b.life > 0;
+            });
+
+            if (this.hp <= 0) {
+                this.isDead = true;
+                this.deathTimer++;
+                if (this.isEngaged && this.engagedTarget) {
+                    this.engagedTarget.isEngaged = false;
+                    this.engagedTarget.engagedTarget = null;
+                }
+                return;
+            }
+
+            // Проверяем, не должен ли юнит совершить самоубийственную атаку на лагерь
+            if (this.isAlly && this.suicideAttackCamp()) {
+                return; // Юнит погиб, завершаем обновление
+            }
+
+            const target = this.findTarget();
+            
+            if (target && target.hp > 0 && !target.isCamp && !target.isCastle) {
+                const dist = Math.hypot(target.x - this.x, target.y - this.y);
+                const engageRange = this.range + target.range;
+                
+                if (dist < engageRange + 30) {
+                    if (!target.isEngaged || target.engagedTarget === this) {
+                        this.isEngaged = true;
+                        this.engagedTarget = target;
+                        target.isEngaged = true;
+                        target.engagedTarget = this;
+                    }
+                }
+            }
+
+            if (this.isAlly) {
+                if (target) {
+                    const tx = target.x || target.x;
+                    const ty = target.y || target.y;
+                    const dx = tx - this.x;
+                    const dy = ty - this.y;
+                    const dist = Math.hypot(dx, dy);
+                    this.facing = dx > 0 ? 1 : -1;
+
+if (target.isCamp) {
+    const dist = Math.hypot(tx - this.x, ty - this.y);
+    if (dist < 200) {
+        // Юнит достиг лагеря - исчезает и наносит урон
+        this.state = 'attacking';
+        if (this.attackCooldown === 0 && enemyCampHP > 0) {
+            // Наносим урон равный силе юнита
+            const damage = this.damage * 2; // Удвоенный урон за самопожертвование
+            enemyCampHP = Math.max(0, enemyCampHP - damage);
+            this.attackAnim = 10;
+            addAnimation(this.x, this.y - 30, 'sacrifice', '#ff6644');
+            addAnimation(this.x, this.y - 40, 'explosion', '#ff8800');
+            this.attackCooldown = this.attackSpeed;
+            
+            // Юнит исчезает (жертвует собой)
+            this.hp = 0;
+            this.isDead = true;
+            
+            // Удаляем из массивов
+            const idx = allies.indexOf(this);
+            if (idx !== -1) allies.splice(idx, 1);
+            const idx2 = allUnits.indexOf(this);
+            if (idx2 !== -1) allUnits.splice(idx2, 1);
+            
+            // Проверяем миссию
+            if (enemyCampHP <= 0) {
+                checkMission();
+                // Добавляем анимацию победы над лагерем
+                addAnimation(this.campX, this.campY, 'camp_destroyed', '#ff4444');
+            }
+            updateHUD();
+        }
+        this.vx *= 0.8;
+        this.vy *= 0.8;
+    } else {
+        this.state = 'moving';
+        const angle = Math.atan2(dy, dx);
+        this.vx = Math.cos(angle) * this.speed * 0.9;
+        this.vy = Math.sin(angle) * this.speed * 0.9;
+    }
+    this.avoidUnits();
+    this.avoidObstacles();
+    return;
+}
+
+                    if (this.isEngaged && target.hp > 0) {
+                        this.state = 'attacking';
+                        if (this.attackCooldown === 0) {
+                            this.performAttack(target);
+                        }
+                        this.vx *= 0.8;
+                        this.vy *= 0.8;
+                    } else if (dist < this.range) {
+                        this.state = 'attacking';
+                        if (this.attackCooldown === 0) {
+                            this.performAttack(target);
+                        }
+                        this.vx *= 0.8;
+                        this.vy *= 0.8;
+                    } else {
+                        this.state = 'moving';
+                        const angle = Math.atan2(dy, dx);
+                        this.vx = Math.cos(angle) * this.speed * 0.8;
+                        this.vy = Math.sin(angle) * this.speed * 0.8;
+                    }
+                } else {
+                    const cfg = getLevelConfig(currentLevelId);
+                    if (cfg) {
+                        const dx = cfg.campX - this.x;
+                        const dy = cfg.campY - this.y;
+                        const dist = Math.hypot(dx, dy);
+                        if (dist > 10) {
+                            this.state = 'moving';
+                            const angle = Math.atan2(dy, dx);
+                            this.vx = Math.cos(angle) * this.speed * 0.8;
+                            this.vy = Math.sin(angle) * this.speed * 0.8;
+                            this.facing = dx > 0 ? 1 : -1;
+                        } else {
+                            if (enemyCampHP > 0) {
+                                enemyCampHP = Math.max(0, enemyCampHP - 3);
+                                addAnimation(this.x, this.y - 30, 'camp_damage', '#ff4444');
+                                addAnimation(this.x, this.y, 'explosion', '#ff6600');
+                                this.hp = 0;
+                                this.isDead = true;
+                                if (enemyCampHP <= 0) checkMission();
+                            }
+                            this.vx *= 0.8;
+                            this.vy *= 0.8;
+                        }
+                    }
+                }
+                this.avoidUnits();
+                this.avoidObstacles();
+            } else {
+                // ВРАГИ
+                if (target) {
+                    let tx = target.x || target.x;
+                    let ty = target.y || target.y;
+                    const dx = tx - this.x;
+                    const dy = ty - this.y;
+                    const dist = Math.hypot(dx, dy);
+                    this.facing = dx > 0 ? 1 : -1;
+
+                    if (this.isEngaged && target.hp > 0) {
+                        this.state = 'attacking';
+                        this.attackTimer++;
+                        if (this.attackTimer % 30 === 0) {
+                            this.hitAnim = 8;
+                            if (target.hp > 0) {
+                                target.hp -= this.damage;
+                                addAnimation(target.x, target.y - 20, 'damage', '#ff4444');
+                                if (target.hp <= 0) {
+                                    const idx = allies.indexOf(target);
+                                    if (idx !== -1) allies.splice(idx, 1);
+                                    const idx2 = allUnits.indexOf(target);
+                                    if (idx2 !== -1) allUnits.splice(idx2, 1);
+                                    updateHUD();
+                                    this.isEngaged = false;
+                                    this.engagedTarget = null;
+                                }
+                            }
+                        }
+                        this.vx *= 0.8;
+                        this.vy *= 0.8;
+                    } else if (dist < 40) {
+                        this.state = 'attacking';
+                        this.attackTimer++;
+                        if (this.attackTimer % 30 === 0) {
+                            this.hitAnim = 8;
+                            if (target.isCastle) {
+                                castleHP = Math.max(0, castleHP - this.damage);
+                                addAnimation(this.x, this.y - 30, 'damage', '#ff4444');
+                                updateCastleHUD();
+                                if (castleHP <= 0) {
+                                    triggerGameOver('Замок разрушен!');
+                                }
+                            } else if (target.hp > 0) {
+                                target.hp -= this.damage;
+                                addAnimation(target.x, target.y - 20, 'damage', '#ff4444');
+                                if (target.hp <= 0) {
+                                    const idx = allies.indexOf(target);
+                                    if (idx !== -1) allies.splice(idx, 1);
+                                    const idx2 = allUnits.indexOf(target);
+                                    if (idx2 !== -1) allUnits.splice(idx2, 1);
+                                    updateHUD();
+                                }
+                            }
+                        }
+                        this.vx *= 0.8;
+                        this.vy *= 0.8;
+                    } else {
+                        this.state = 'moving';
+                        const angle = Math.atan2(dy, dx);
+                        this.vx = Math.cos(angle) * this.speed * 0.6;
+                        this.vy = Math.sin(angle) * this.speed * 0.6;
+                    }
+                } else {
+                    this.state = 'idle';
+                    const dx = this.campX - this.x;
+                    const dy = this.campY - this.y;
+                    const dist = Math.hypot(dx, dy);
+                    if (dist > 10) {
+                        const angle = Math.atan2(dy, dx);
+                        this.vx = Math.cos(angle) * this.speed * 0.4;
+                        this.vy = Math.sin(angle) * this.speed * 0.4;
+                        this.facing = dx > 0 ? 1 : -1;
+                    } else {
+                        this.vx += (Math.random() - 0.5) * 0.05;
+                        this.vy += (Math.random() - 0.5) * 0.05;
+                    }
+                }
+                this.avoidUnits();
+                this.avoidObstacles();
+            }
+
+            if (!this.isRooted && !this.isEngaged) {
+                this.x += this.vx;
+                this.y += this.vy;
+            } else if (!this.isRooted && this.isEngaged) {
+                this.x += this.vx * 0.3;
+                this.y += this.vy * 0.3;
+            }
+
+            if (this.x < 22) { this.x = 22; this.vx = Math.abs(this.vx) * 0.9; }
+            if (this.x > width - 22) { this.x = width - 22; this.vx = -Math.abs(this.vx) * 0.9; }
+            if (this.y < 22) { this.y = 22; this.vy = Math.abs(this.vy) * 0.9; }
+            if (this.y > height - 22) { this.y = height - 22; this.vy = -Math.abs(this.vy) * 0.9; }
+
+            const sp = Math.hypot(this.vx, this.vy);
+            const maxSp = this.state === 'attacking' ? 1.0 : 1.2;
+            if (sp > maxSp) { this.vx = (this.vx / sp) * maxSp; this.vy = (this.vy / sp) * maxSp; }
+
+            if (this.type === 'ghost') {
+                this.ghostFlicker = 0.6 + 0.4 * Math.sin(Date.now() / 250 + this.phase);
+            }
+        }
+
+        performAttack(target) {
+            this.attackAnim = 10;
+            if (this.type === 'sniper') {
+                this.bullets.push({
+                    x: this.x + 15 * this.facing,
+                    y: this.y - 4,
+                    vx: 10 * this.facing,
+                    vy: 0,
+                    life: 40,
+                    target: target
+                });
+                target.hp -= this.damage;
+                addAnimation(target.x, target.y - 20, 'shot', '#ff2222');
+                addAnimation(target.x, target.y - 20, 'red_shot', '#ff0000');
+            } else if (this.type === 'swordsman') {
+                target.hp -= this.damage;
+                addAnimation(target.x, target.y - 20, 'slash', '#ff6644');
+            } else if (this.type === 'bishop') {
+                for (const ally of allies) {
+                    if (ally.hp < ally.maxHp && Math.hypot(ally.x - this.x, ally.y - this.y) < 120) {
+                        ally.hp = Math.min(ally.maxHp, ally.hp + 2);
+                        addAnimation(ally.x, ally.y - 20, 'heal', '#88dd88');
+                    }
+                }
+                target.hp -= this.damage;
+                addAnimation(target.x, target.y - 20, 'holy', '#ffaa88');
+            } else if (this.type === 'druid') {
+                const dist = Math.hypot(target.x - this.x, target.y - this.y);
+                if (dist < 120 && !target.isRooted) {
+                    target.isRooted = true;
+                    target.rootTimer = 80;
+                    addAnimation(target.x, target.y - 20, 'root', '#44dd88');
+                }
+                target.hp -= 1;
+            } else {
+                target.hp -= this.damage;
+                addAnimation(target.x, target.y - 20, 'damage', '#ff4444');
+            }
+            this.attackCooldown = this.attackSpeed;
+            
+            if (target.hp <= 0) {
+                if (!target.isCastle && !target.isCamp) {
+                    gold += 5;
+                    updateHUD();
+                    const enemyType = target.type || 'unknown';
+                    updateMissionProgress('kill', enemyType);
+                    const idx = enemies.indexOf(target);
+                    if (idx !== -1) enemies.splice(idx, 1);
+                    const idx2 = allUnits.indexOf(target);
+                    if (idx2 !== -1) allUnits.splice(idx2, 1);
+                    if (target.isEngaged && target.engagedTarget) {
+                        target.engagedTarget.isEngaged = false;
+                        target.engagedTarget.engagedTarget = null;
+                    }
+                    checkMission();
+                }
+            }
+        }
+
+        draw(ctx) {
+            if (this.isDead) return;
+            for (const b of this.bullets) {
+                ctx.save();
+                ctx.shadowBlur = 30;
+                ctx.shadowColor = '#ff3333';
+                ctx.fillStyle = '#ff3333';
+                ctx.beginPath();
+                ctx.arc(b.x, b.y, 5, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = 'rgba(255,50,50,0.4)';
+                ctx.shadowBlur = 50;
+                ctx.beginPath();
+                ctx.arc(b.x, b.y, 12, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
+            if (this.isAlly) this.drawAlly(ctx);
+            else this.drawEnemy(ctx);
+            ctx.shadowBlur = 0;
+        }
+
+        drawEnemy(ctx) {
+            const x = this.x, y = this.y, f = this.facing, walk = this.walkCycle, s = 1.0;
+            const legSwing = Math.sin(walk) * 4 * s;
+            const armSwing = Math.sin(walk + 0.5) * 5 * s;
+
+            ctx.shadowColor = 'rgba(0,0,0,0.6)';
+            ctx.shadowBlur = 10;
+
+            let bodyColor, headColor, eyeColor;
+            if (this.type === 'skeleton') {
+                bodyColor = '#8a8a7a';
+                headColor = '#c4c4b4';
+                eyeColor = '#ff4444';
+            } else {
+                bodyColor = this.getBodyColor();
+                headColor = this.getHeadColor();
+                eyeColor = this.getEyeColor();
+            }
+
+            ctx.fillStyle = bodyColor;
+            ctx.save();
+            ctx.translate(x - 4 * s, y + 4 * s);
+            ctx.rotate(legSwing * 0.015);
+            ctx.beginPath();
+            ctx.roundRect(-3 * s, 0, 6 * s, 14 * s, 3);
+            ctx.fill();
+            ctx.restore();
+            ctx.save();
+            ctx.translate(x + 4 * s, y + 4 * s);
+            ctx.rotate(-legSwing * 0.015);
+            ctx.beginPath();
+            ctx.roundRect(-3 * s, 0, 6 * s, 14 * s, 3);
+            ctx.fill();
+            ctx.restore();
+
+            ctx.shadowBlur = 12;
+            ctx.fillStyle = bodyColor;
+            ctx.beginPath();
+            ctx.roundRect(x - 10 * s, y - 6 * s, 20 * s, 16 * s, 4);
+            ctx.fill();
+
+            ctx.fillStyle = this.type === 'zombie' ? '#3a5a3a' :
+                           this.type === 'werewolf' ? '#6a4a2a' :
+                           this.type === 'vampire' ? '#2a0a0a' :
+                           this.type === 'skeleton' ? '#6a6a5a' :
+                           'rgba(180,200,230,0.2)';
+            ctx.beginPath();
+            ctx.roundRect(x - 6 * s, y - 2 * s, 12 * s, 10 * s, 3);
+            ctx.fill();
+
+            ctx.shadowBlur = 8;
+            ctx.fillStyle = bodyColor;
+            ctx.save();
+            ctx.translate(x - 13 * s, y - 2 * s);
+            ctx.rotate(-0.15 + armSwing * 0.025);
+            ctx.beginPath();
+            ctx.roundRect(-3 * s, 0, 6 * s, 13 * s, 3);
+            ctx.fill();
+            ctx.restore();
+            ctx.save();
+            ctx.translate(x + 13 * s, y - 2 * s);
+            ctx.rotate(0.15 - armSwing * 0.025);
+            ctx.beginPath();
+            ctx.roundRect(-3 * s, 0, 6 * s, 13 * s, 3);
+            ctx.fill();
+            ctx.restore();
+
+            ctx.shadowBlur = 14;
+            ctx.fillStyle = headColor;
+            ctx.beginPath();
+            ctx.arc(x, y - 15 * s, 12 * s, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.shadowBlur = 0;
+            ctx.fillStyle = eyeColor;
+            ctx.beginPath();
+            ctx.arc(x - 5 * s * f, y - 18 * s, 3.5 * s, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(x + 5 * s * f, y - 18 * s, 3.5 * s, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = this.type === 'skeleton' ? '#220000' : '#111';
+            ctx.beginPath();
+            ctx.arc(x - 4 * s * f, y - 17 * s, 1.8 * s, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(x + 6 * s * f, y - 17 * s, 1.8 * s, 0, Math.PI * 2);
+            ctx.fill();
+
+            if (this.type !== 'skeleton') {
+                ctx.strokeStyle = this.type === 'zombie' ? '#2a3a2a' : '#2a1a1a';
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                ctx.arc(x, y - 10 * s, 5 * s, 0.1, Math.PI - 0.1);
+                ctx.stroke();
+            } else {
+                ctx.strokeStyle = '#666655';
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                ctx.arc(x, y - 9 * s, 4 * s, 0.3, Math.PI - 0.3);
+                ctx.stroke();
+                ctx.fillStyle = '#7a7a6a';
+                for (let i = -2; i <= 2; i++) {
+                    ctx.fillRect(x + i * 5 * s, y - 2 * s, 2 * s, 4 * s);
+                }
+            }
+
+            this.drawExtra(ctx);
+        }
+
+        drawAlly(ctx) {
+            const x = this.x, y = this.y, f = this.facing, walk = this.walkCycle, s = 1.0;
+            const legSwing = Math.sin(walk) * 4 * s;
+            const armSwing = Math.sin(walk + 0.5) * 5 * s;
+            const attackSwing = this.attackAnim > 0 ? Math.sin(this.attackAnim / 10 * Math.PI) * 20 : 0;
+
+            ctx.shadowColor = 'rgba(0,0,0,0.5)';
+            ctx.shadowBlur = 8;
+
+            if (this.type === 'swordsman') {
+                ctx.fillStyle = '#3a4a5a';
+                ctx.save();
+                ctx.translate(x - 4 * s, y + 4 * s);
+                ctx.rotate(legSwing * 0.015);
+                ctx.beginPath();
+                ctx.roundRect(-3 * s, 0, 6 * s, 14 * s, 3);
+                ctx.fill();
+                ctx.restore();
+                ctx.save();
+                ctx.translate(x + 4 * s, y + 4 * s);
+                ctx.rotate(-legSwing * 0.015);
+                ctx.beginPath();
+                ctx.roundRect(-3 * s, 0, 6 * s, 14 * s, 3);
+                ctx.fill();
+                ctx.restore();
+
+                const grad = ctx.createLinearGradient(x - 12, y - 8, x + 12, y + 10);
+                grad.addColorStop(0, '#5a7a8a');
+                grad.addColorStop(0.5, '#4a6a7a');
+                grad.addColorStop(1, '#3a5a6a');
+                ctx.fillStyle = grad;
+                ctx.beginPath();
+                ctx.roundRect(x - 12 * s, y - 8 * s, 24 * s, 18 * s, 4);
+                ctx.fill();
+
+                ctx.fillStyle = '#5a7a8a';
+                ctx.beginPath();
+                ctx.roundRect(x - 8 * s, y - 4 * s, 16 * s, 12 * s, 3);
+                ctx.fill();
+                ctx.fillStyle = '#6a8a9a';
+                ctx.beginPath();
+                ctx.roundRect(x - 4 * s, y - 2 * s, 8 * s, 8 * s, 2);
+                ctx.fill();
+
+                ctx.fillStyle = '#d4c8b8';
+                ctx.beginPath();
+                ctx.arc(x, y - 16 * s, 11 * s, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.fillStyle = '#6a8aaa';
+                ctx.beginPath();
+                ctx.arc(x, y - 18 * s, 10 * s, 0, Math.PI);
+                ctx.fill();
+                ctx.fillStyle = '#8aaacc';
+                ctx.beginPath();
+                ctx.arc(x, y - 20 * s, 6 * s, 0, Math.PI);
+                ctx.fill();
+                ctx.fillStyle = '#8aaacc';
+                ctx.beginPath();
+                ctx.moveTo(x - 2 * s, y - 22 * s);
+                ctx.lineTo(x, y - 28 * s);
+                ctx.lineTo(x + 2 * s, y - 22 * s);
+                ctx.fill();
+
+                ctx.save();
+                ctx.translate(x - 16 * s, y - 4 * s);
+                ctx.shadowBlur = 8;
+                const shieldGrad = ctx.createLinearGradient(-6, -10, 6, 10);
+                shieldGrad.addColorStop(0, '#6a7a8a');
+                shieldGrad.addColorStop(0.5, '#8a9aaa');
+                shieldGrad.addColorStop(1, '#5a6a7a');
+                ctx.fillStyle = shieldGrad;
+                ctx.beginPath();
+                ctx.roundRect(-6 * s, -10 * s, 12 * s, 20 * s, 3);
+                ctx.fill();
+                ctx.fillStyle = '#9aaabc';
+                ctx.beginPath();
+                ctx.roundRect(-4 * s, -7 * s, 8 * s, 14 * s, 2);
+                ctx.fill();
+                ctx.fillStyle = '#ffdd44';
+                ctx.shadowBlur = 12;
+                ctx.shadowColor = 'rgba(255,221,68,0.3)';
+                ctx.beginPath();
+                ctx.arc(0, 0, 4 * s, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+
+                ctx.save();
+                ctx.translate(x + 14 * f * s, y - 4 * s);
+                ctx.rotate(f * 0.4 + (f > 0 ? attackSwing * 0.05 : -attackSwing * 0.05));
+                ctx.shadowBlur = 10;
+                ctx.shadowColor = 'rgba(200,220,255,0.2)';
+                ctx.fillStyle = '#8a7a5a';
+                ctx.fillRect(0, -3, 6 * f, 6);
+                ctx.fillStyle = '#6a5a3a';
+                ctx.fillRect(2 * f, -5, 2 * f, 10);
+                ctx.fillStyle = '#ddeeff';
+                ctx.shadowBlur = 15;
+                ctx.shadowColor = 'rgba(200,220,255,0.4)';
+                ctx.beginPath();
+                ctx.moveTo(6 * f, -3);
+                ctx.lineTo(26 * f, -14);
+                ctx.lineTo(26 * f, -4);
+                ctx.lineTo(6 * f, 3);
+                ctx.fill();
+                ctx.fillStyle = '#eeffff';
+                ctx.beginPath();
+                ctx.moveTo(6 * f, -1);
+                ctx.lineTo(22 * f, -10);
+                ctx.lineTo(22 * f, -6);
+                ctx.lineTo(6 * f, 1);
+                ctx.fill();
+                ctx.restore();
+
+                ctx.shadowBlur = 0;
+                ctx.fillStyle = '#3a4a5a';
+                ctx.beginPath();
+                ctx.arc(x - 4 * s * f, y - 18 * s, 3 * s, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.beginPath();
+                ctx.arc(x + 4 * s * f, y - 18 * s, 3 * s, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#88ddff';
+                ctx.beginPath();
+                ctx.arc(x - 3 * s * f, y - 17 * s, 1.2 * s, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.beginPath();
+                ctx.arc(x + 5 * s * f, y - 17 * s, 1.2 * s, 0, Math.PI * 2);
+                ctx.fill();
+
+            } else if (this.type === 'sniper') {
+                ctx.fillStyle = '#3a5a3a';
+                ctx.save();
+                ctx.translate(x - 3 * s, y + 4 * s);
+                ctx.rotate(legSwing * 0.015);
+                ctx.beginPath();
+                ctx.roundRect(-2 * s, 0, 4 * s, 10 * s, 2);
+                ctx.fill();
+                ctx.restore();
+                ctx.save();
+                ctx.translate(x + 3 * s, y + 4 * s);
+                ctx.rotate(-legSwing * 0.015);
+                ctx.beginPath();
+                ctx.roundRect(-2 * s, 0, 4 * s, 10 * s, 2);
+                ctx.fill();
+                ctx.restore();
+
+                const bodyGrad = ctx.createLinearGradient(x - 8, y - 4, x + 8, y + 8);
+                bodyGrad.addColorStop(0, '#6a8a6a');
+                bodyGrad.addColorStop(0.5, '#5a7a5a');
+                bodyGrad.addColorStop(1, '#4a6a4a');
+                ctx.fillStyle = bodyGrad;
+                ctx.beginPath();
+                ctx.roundRect(x - 8 * s, y - 4 * s, 16 * s, 12 * s, 4);
+                ctx.fill();
+
+                ctx.fillStyle = '#3a5a3a';
+                ctx.fillRect(x - 7 * s, y + 4 * s, 14 * s, 2 * s);
+
+                ctx.fillStyle = '#d4b88a';
+                ctx.beginPath();
+                ctx.arc(x, y - 14 * s, 11 * s, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.fillStyle = '#c4b09a';
+                ctx.beginPath();
+                ctx.ellipse(x, y - 6 * s, 7 * s, 9 * s, 0, 0, Math.PI);
+                ctx.fill();
+                ctx.fillStyle = '#b4a08a';
+                ctx.beginPath();
+                ctx.ellipse(x, y - 5 * s, 5 * s, 7 * s, 0, 0, Math.PI);
+                ctx.fill();
+
+                ctx.fillStyle = '#3a6a3a';
+                ctx.beginPath();
+                ctx.moveTo(x - 12 * s, y - 18 * s);
+                ctx.lineTo(x, y - 30 * s);
+                ctx.lineTo(x + 12 * s, y - 18 * s);
+                ctx.fill();
+                ctx.fillStyle = '#4a7a4a';
+                ctx.beginPath();
+                ctx.rect(x - 13 * s, y - 18 * s, 26 * s, 3 * s);
+                ctx.fill();
+                ctx.fillStyle = '#ffdd44';
+                ctx.beginPath();
+                ctx.rect(x - 1 * s, y - 24 * s, 2 * s, 3 * s);
+                ctx.fill();
+
+                ctx.save();
+                ctx.translate(x + 10 * f * s, y - 2 * s);
+                ctx.rotate(f * 0.2 + (f > 0 ? attackSwing * 0.04 : -attackSwing * 0.04));
+                ctx.shadowBlur = 6;
+                const blasterGrad = ctx.createLinearGradient(0, -4, 0, 4);
+                blasterGrad.addColorStop(0, '#6a8a9a');
+                blasterGrad.addColorStop(0.5, '#8aaacc');
+                blasterGrad.addColorStop(1, '#5a7a8a');
+                ctx.fillStyle = blasterGrad;
+                ctx.fillRect(0, -4, 18 * f, 8);
+                ctx.fillStyle = '#4a6a7a';
+                ctx.fillRect(16 * f, -3, 8 * f, 6);
+                if (this.attackAnim > 0) {
+                    ctx.fillStyle = 'rgba(255,50,50,0.5)';
+                    ctx.shadowBlur = 40;
+                    ctx.shadowColor = '#ff3333';
+                    ctx.beginPath();
+                    ctx.arc(24 * f, 0, 10, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.fillStyle = 'rgba(255,100,100,0.3)';
+                    ctx.beginPath();
+                    ctx.arc(24 * f, 0, 16, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                ctx.restore();
+
+                ctx.shadowBlur = 0;
+                ctx.fillStyle = '#3a4a3a';
+                ctx.beginPath();
+                ctx.arc(x - 4 * s * f, y - 17 * s, 3 * s, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.beginPath();
+                ctx.arc(x + 4 * s * f, y - 17 * s, 3 * s, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#88ddff';
+                ctx.beginPath();
+                ctx.arc(x - 3 * s * f, y - 16 * s, 1.5 * s, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.beginPath();
+                ctx.arc(x + 5 * s * f, y - 16 * s, 1.5 * s, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.strokeStyle = '#6a6a5a';
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                ctx.arc(x - 4 * s * f, y - 17 * s, 4 * s, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.arc(x + 4 * s * f, y - 17 * s, 4 * s, 0, Math.PI * 2);
+                ctx.stroke();
+
+            } else if (this.type === 'bishop') {
+                ctx.fillStyle = '#5a4a6a';
+                ctx.save();
+                ctx.translate(x - 4 * s, y + 4 * s);
+                ctx.rotate(legSwing * 0.015);
+                ctx.beginPath();
+                ctx.roundRect(-3 * s, 0, 6 * s, 13 * s, 3);
+                ctx.fill();
+                ctx.restore();
+                ctx.save();
+                ctx.translate(x + 4 * s, y + 4 * s);
+                ctx.rotate(-legSwing * 0.015);
+                ctx.beginPath();
+                ctx.roundRect(-3 * s, 0, 6 * s, 13 * s, 3);
+                ctx.fill();
+                ctx.restore();
+
+                const robeGrad = ctx.createLinearGradient(x - 10, y - 6, x + 10, y + 10);
+                robeGrad.addColorStop(0, '#7a6a8a');
+                robeGrad.addColorStop(0.5, '#6a5a7a');
+                robeGrad.addColorStop(1, '#5a4a6a');
+                ctx.fillStyle = robeGrad;
+                ctx.beginPath();
+                ctx.roundRect(x - 10 * s, y - 6 * s, 20 * s, 16 * s, 4);
+                ctx.fill();
+
+                ctx.fillStyle = '#8a7a9a';
+                ctx.beginPath();
+                ctx.roundRect(x - 6 * s, y - 2 * s, 12 * s, 10 * s, 3);
+                ctx.fill();
+                ctx.fillStyle = '#9a8aaa';
+                ctx.beginPath();
+                ctx.arc(x, y + 2 * s, 4 * s, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.fillStyle = '#e8e0d0';
+                ctx.beginPath();
+                ctx.arc(x, y - 15 * s, 12 * s, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.fillStyle = '#d4c8b0';
+                ctx.beginPath();
+                ctx.moveTo(x - 12 * s, y - 18 * s);
+                ctx.quadraticCurveTo(x, y - 34 * s, x + 12 * s, y - 18 * s);
+                ctx.fill();
+                ctx.fillStyle = '#e4d8c0';
+                ctx.beginPath();
+                ctx.moveTo(x - 8 * s, y - 20 * s);
+                ctx.quadraticCurveTo(x, y - 30 * s, x + 8 * s, y - 20 * s);
+                ctx.fill();
+
+                ctx.fillStyle = '#f0ece4';
+                ctx.beginPath();
+                ctx.ellipse(x, y - 6 * s, 8 * s, 12 * s, 0, 0, Math.PI);
+                ctx.fill();
+                ctx.fillStyle = '#e8e4dc';
+                ctx.beginPath();
+                ctx.ellipse(x, y - 5 * s, 6 * s, 9 * s, 0, 0, Math.PI);
+                ctx.fill();
+
+                ctx.save();
+                ctx.translate(x + 12 * f * s, y - 4 * s);
+                ctx.rotate(f * 0.3 + (f > 0 ? attackSwing * 0.04 : -attackSwing * 0.04));
+                ctx.shadowBlur = 6;
+                ctx.strokeStyle = '#8a7a5a';
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.moveTo(0, 0);
+                ctx.lineTo(14 * f, -18);
+                ctx.stroke();
+                ctx.fillStyle = '#ffdd44';
+                ctx.shadowBlur = 15;
+                ctx.shadowColor = 'rgba(255,221,68,0.3)';
+                ctx.beginPath();
+                ctx.arc(14 * f, -18, 5, 0, Math.PI * 2);
+                ctx.fill();
+                if (this.attackAnim > 0) {
+                    ctx.fillStyle = 'rgba(255,221,68,0.2)';
+                    ctx.shadowBlur = 30;
+                    ctx.shadowColor = 'rgba(255,221,68,0.3)';
+                    ctx.beginPath();
+                    ctx.arc(14 * f, -18, 16, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                ctx.restore();
+
+                ctx.shadowBlur = 0;
+                ctx.fillStyle = '#3a2a3a';
+                ctx.beginPath();
+                ctx.arc(x - 4 * s * f, y - 18 * s, 3 * s, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.beginPath();
+                ctx.arc(x + 4 * s * f, y - 18 * s, 3 * s, 0, Math.PI * 2);
+                ctx.fill();
+
+            } else if (this.type === 'druid') {
+                ctx.fillStyle = '#3a6a3a';
+                ctx.save();
+                ctx.translate(x - 4 * s, y + 4 * s);
+                ctx.rotate(legSwing * 0.015);
+                ctx.beginPath();
+                ctx.roundRect(-3 * s, 0, 6 * s, 13 * s, 3);
+                ctx.fill();
+                ctx.restore();
+                ctx.save();
+                ctx.translate(x + 4 * s, y + 4 * s);
+                ctx.rotate(-legSwing * 0.015);
+                ctx.beginPath();
+                ctx.roundRect(-3 * s, 0, 6 * s, 13 * s, 3);
+                ctx.fill();
+                ctx.restore();
+
+                const druidGrad = ctx.createLinearGradient(x - 10, y - 6, x + 10, y + 10);
+                druidGrad.addColorStop(0, '#5a8a5a');
+                druidGrad.addColorStop(0.5, '#4a7a4a');
+                druidGrad.addColorStop(1, '#3a6a3a');
+                ctx.fillStyle = druidGrad;
+                ctx.beginPath();
+                ctx.roundRect(x - 10 * s, y - 6 * s, 20 * s, 16 * s, 4);
+                ctx.fill();
+
+                ctx.fillStyle = '#5a9a5a';
+                ctx.beginPath();
+                ctx.roundRect(x - 6 * s, y - 2 * s, 12 * s, 10 * s, 3);
+                ctx.fill();
+
+                ctx.fillStyle = '#8aaa7a';
+                ctx.beginPath();
+                ctx.arc(x, y - 15 * s, 12 * s, 0, Math.PI * 2);
+                ctx.fill();
+
+                for (let i = 0; i < 8; i++) {
+                    const a = i / 8 * Math.PI * 2;
+                    ctx.fillStyle = i % 2 === 0 ? '#3a8a3a' : '#4a9a4a';
+                    ctx.beginPath();
+                    ctx.arc(x + Math.cos(a) * 14 * s, y - 15 * s + Math.sin(a) * 10 * s, 4 * s, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                for (let i = 0; i < 4; i++) {
+                    const a = i / 4 * Math.PI * 2 + 0.3;
+                    ctx.fillStyle = ['#ff6688', '#ffaa44', '#88ddff', '#ff88aa'][i];
+                    ctx.beginPath();
+                    ctx.arc(x + Math.cos(a) * 16 * s, y - 15 * s + Math.sin(a) * 12 * s, 2.5 * s, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+
+                ctx.save();
+                ctx.translate(x + 12 * f * s, y - 2 * s);
+                ctx.rotate(f * 0.3 + (f > 0 ? attackSwing * 0.04 : -attackSwing * 0.04));
+                ctx.shadowBlur = 6;
+                ctx.strokeStyle = '#5a3a2a';
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.moveTo(0, 0);
+                ctx.lineTo(16 * f, -20);
+                ctx.stroke();
+                ctx.fillStyle = '#66dd88';
+                ctx.shadowBlur = 20;
+                ctx.shadowColor = 'rgba(102,221,136,0.3)';
+                ctx.beginPath();
+                ctx.arc(16 * f, -20, 6, 0, Math.PI * 2);
+                ctx.fill();
+                if (this.attackAnim > 0) {
+                    ctx.fillStyle = 'rgba(102,221,136,0.2)';
+                    ctx.shadowBlur = 35;
+                    ctx.shadowColor = 'rgba(102,221,136,0.3)';
+                    ctx.beginPath();
+                    ctx.arc(16 * f, -20, 18, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                ctx.restore();
+
+                ctx.shadowBlur = 0;
+                ctx.fillStyle = '#3a2a2a';
+                ctx.beginPath();
+                ctx.arc(x - 4 * s * f, y - 18 * s, 3 * s, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.beginPath();
+                ctx.arc(x + 4 * s * f, y - 18 * s, 3 * s, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#88dd66';
+                ctx.beginPath();
+                ctx.arc(x - 3 * s * f, y - 17 * s, 1.2 * s, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.beginPath();
+                ctx.arc(x + 5 * s * f, y - 17 * s, 1.2 * s, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#8aaa7a';
+                ctx.beginPath();
+                ctx.moveTo(x - 12 * s * f, y - 20 * s);
+                ctx.lineTo(x - 16 * s * f, y - 28 * s);
+                ctx.lineTo(x - 10 * s * f, y - 22 * s);
+                ctx.fill();
+                ctx.beginPath();
+                ctx.moveTo(x + 12 * s * f, y - 20 * s);
+                ctx.lineTo(x + 16 * s * f, y - 28 * s);
+                ctx.lineTo(x + 10 * s * f, y - 22 * s);
+                ctx.fill();
+            }
+            ctx.shadowBlur = 0;
+        }
+
+        getBodyColor() {
+            const map = { 'zombie':'#4a6a42','werewolf':'#7a5a3a','vampire':'#3a1a1a','ghost':'rgba(200,225,250,0.7)' };
+            return map[this.type] || '#4a4a4a';
+        }
+        getHeadColor() {
+            const map = { 'zombie':'#6a8a5a','werewolf':'#b8874a','vampire':'#e8d8d0','ghost':'rgba(220,240,255,0.6)' };
+            return map[this.type] || '#8a8a8a';
+        }
+        getEyeColor() {
+            const map = { 'zombie':'#bfd0b5','werewolf':'#f5d742','vampire':'#c0243a','ghost':'rgba(180,210,240,0.6)' };
+            return map[this.type] || '#ddd';
+        }
+
+        drawExtra(ctx) {
+            const x = this.x, y = this.y, f = this.facing, s = 1.0;
+            if (this.type === 'werewolf') {
+                ctx.shadowBlur = 6;
+                ctx.fillStyle = '#5a3a22';
+                ctx.beginPath();
+                ctx.moveTo(x - 8 * s, y - 25 * s);
+                ctx.lineTo(x - 13 * s, y - 36 * s);
+                ctx.lineTo(x - 4 * s, y - 29 * s);
+                ctx.fill();
+                ctx.beginPath();
+                ctx.moveTo(x + 8 * s, y - 25 * s);
+                ctx.lineTo(x + 13 * s, y - 36 * s);
+                ctx.lineTo(x + 4 * s, y - 29 * s);
+                ctx.fill();
+                ctx.shadowBlur = 0;
+                ctx.fillStyle = '#f0e8d0';
+                ctx.beginPath();
+                ctx.moveTo(x - 5 * s, y - 7 * s);
+                ctx.lineTo(x - 2 * s, y + 1 * s);
+                ctx.lineTo(x + 1 * s, y - 7 * s);
+                ctx.fill();
+                ctx.beginPath();
+                ctx.moveTo(x + 5 * s, y - 7 * s);
+                ctx.lineTo(x + 8 * s, y + 1 * s);
+                ctx.lineTo(x + 11 * s, y - 7 * s);
+                ctx.fill();
+                ctx.strokeStyle = '#5a3a22';
+                ctx.lineWidth = 2;
+                for (let i = -2; i <= 2; i++) {
+                    ctx.beginPath();
+                    ctx.moveTo(x + i * 5 * s, y - 4 * s);
+                    ctx.lineTo(x + i * 7 * s, y - 11 * s - Math.abs(i) * 2);
+                    ctx.stroke();
+                }
+                ctx.fillStyle = '#2a1a0a';
+                ctx.beginPath();
+                ctx.arc(x + 2 * s * f, y - 14 * s, 3 * s, 0, Math.PI * 2);
+                ctx.fill();
+            } else if (this.type === 'vampire') {
+                ctx.shadowBlur = 12;
+                ctx.fillStyle = '#6f1a2e';
+                ctx.beginPath();
+                ctx.moveTo(x - 6 * s, y + 2 * s);
+                ctx.lineTo(x - 20 * s, y + 12 * s);
+                ctx.lineTo(x - 12 * s, y + 18 * s);
+                ctx.lineTo(x - 4 * s, y + 8 * s);
+                ctx.fill();
+                ctx.beginPath();
+                ctx.moveTo(x + 6 * s, y + 2 * s);
+                ctx.lineTo(x + 20 * s, y + 12 * s);
+                ctx.lineTo(x + 12 * s, y + 18 * s);
+                ctx.lineTo(x + 4 * s, y + 8 * s);
+                ctx.fill();
+                ctx.fillStyle = '#3d0f1a';
+                ctx.beginPath();
+                ctx.moveTo(x - 8 * s, y - 4 * s);
+                ctx.lineTo(x - 2 * s, y - 17 * s);
+                ctx.lineTo(x + 4 * s, y - 6 * s);
+                ctx.fill();
+                ctx.beginPath();
+                ctx.moveTo(x + 8 * s, y - 4 * s);
+                ctx.lineTo(x + 10 * s, y - 17 * s);
+                ctx.lineTo(x + 4 * s, y - 6 * s);
+                ctx.fill();
+                ctx.shadowBlur = 0;
+                ctx.fillStyle = '#f0e8e0';
+                ctx.beginPath();
+                ctx.moveTo(x - 5 * s * f, y - 9 * s);
+                ctx.lineTo(x - 5 * s * f - 2 * s, y + 1 * s);
+                ctx.lineTo(x - 5 * s * f + 2 * s, y + 1 * s);
+                ctx.fill();
+                ctx.beginPath();
+                ctx.moveTo(x + 5 * s * f, y - 9 * s);
+                ctx.lineTo(x + 5 * s * f - 2 * s, y + 1 * s);
+                ctx.lineTo(x + 5 * s * f + 2 * s, y + 1 * s);
+                ctx.fill();
+                ctx.strokeStyle = '#3d2020';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(x - 9 * s, y - 21 * s);
+                ctx.quadraticCurveTo(x - 4 * s, y - 25 * s, x + 2 * s, y - 21 * s);
+                ctx.stroke();
+                ctx.fillStyle = '#e8e0d0';
+                ctx.beginPath();
+                ctx.moveTo(x - 3 * s * f, y - 9 * s);
+                ctx.lineTo(x - 2 * s * f, y - 5 * s);
+                ctx.lineTo(x - 1 * s * f, y - 8 * s);
+                ctx.fill();
+                ctx.beginPath();
+                ctx.moveTo(x + 3 * s * f, y - 9 * s);
+                ctx.lineTo(x + 2 * s * f, y - 5 * s);
+                ctx.lineTo(x + 1 * s * f, y - 8 * s);
+                ctx.fill();
+            } else if (this.type === 'zombie') {
+                ctx.shadowBlur = 4;
+                ctx.fillStyle = '#2f462a';
+                ctx.beginPath();
+                ctx.arc(x - 8 * s, y + 2 * s, 5 * s, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#56754a';
+                ctx.beginPath();
+                ctx.arc(x + 10 * s, y + 4 * s, 4 * s, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#1c2e1a';
+                ctx.beginPath();
+                ctx.arc(x + 2 * s, y + 12 * s, 4 * s, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.strokeStyle = '#1f2a1a';
+                ctx.lineWidth = 2.5;
+                ctx.shadowBlur = 2;
+                ctx.beginPath();
+                ctx.moveTo(x - 14 * s, y - 10 * s);
+                ctx.lineTo(x - 6 * s, y - 18 * s);
+                ctx.lineTo(x + 2 * s, y - 12 * s);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(x + 4 * s, y - 6 * s);
+                ctx.lineTo(x + 12 * s, y - 14 * s);
+                ctx.lineTo(x + 16 * s, y - 6 * s);
+                ctx.stroke();
+                ctx.fillStyle = '#d4c8b8';
+                ctx.shadowBlur = 8;
+                ctx.beginPath();
+                ctx.moveTo(x + 4 * s, y - 24 * s);
+                ctx.lineTo(x + 10 * s, y - 32 * s);
+                ctx.lineTo(x + 12 * s, y - 24 * s);
+                ctx.fill();
+                ctx.fillStyle = '#8a9a7a';
+                ctx.beginPath();
+                ctx.arc(x - 5 * s * f, y - 18 * s, 3.5 * s, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.beginPath();
+                ctx.arc(x + 5 * s * f, y - 18 * s, 3.5 * s, 0, Math.PI * 2);
+                ctx.fill();
+            } else if (this.type === 'ghost') {
+                const alpha = this.ghostFlicker * 0.7 + 0.2;
+                ctx.shadowColor = `rgba(150,200,255,0.5)`;
+                ctx.shadowBlur = 45;
+                ctx.fillStyle = `rgba(190,220,255,${alpha * 0.15})`;
+                ctx.beginPath();
+                ctx.moveTo(x - 14 * s, y - 2 * s);
+                ctx.lineTo(x - 28 * s, y - 6 * s);
+                ctx.lineTo(x - 24 * s, y + 4 * s);
+                ctx.lineTo(x - 12 * s, y + 2 * s);
+                ctx.fill();
+                ctx.beginPath();
+                ctx.moveTo(x + 14 * s, y - 2 * s);
+                ctx.lineTo(x + 28 * s, y - 6 * s);
+                ctx.lineTo(x + 24 * s, y + 4 * s);
+                ctx.lineTo(x + 12 * s, y + 2 * s);
+                ctx.fill();
+                ctx.shadowBlur = 0;
+                ctx.fillStyle = `rgba(10,20,40,${alpha * 0.9})`;
+                ctx.beginPath();
+                ctx.arc(x - 5 * s * f, y - 18 * s, 4.5 * s, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.beginPath();
+                ctx.arc(x + 5 * s * f, y - 18 * s, 4.5 * s, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = `rgba(20,30,50,${alpha * 0.7})`;
+                ctx.beginPath();
+                ctx.ellipse(x, y - 10 * s, 7 * s, 3.5 * s, 0, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.shadowBlur = 50;
+                ctx.fillStyle = `rgba(180,210,240,${alpha * 0.12})`;
+                ctx.beginPath();
+                ctx.moveTo(x - 16 * s, y + 16 * s);
+                ctx.lineTo(x - 28 * s, y + 26 * s);
+                ctx.lineTo(x - 20 * s, y + 32 * s);
+                ctx.lineTo(x - 8 * s, y + 22 * s);
+                ctx.fill();
+                ctx.beginPath();
+                ctx.moveTo(x + 16 * s, y + 16 * s);
+                ctx.lineTo(x + 28 * s, y + 26 * s);
+                ctx.lineTo(x + 20 * s, y + 32 * s);
+                ctx.lineTo(x + 8 * s, y + 22 * s);
+                ctx.fill();
+                ctx.shadowBlur = 60;
+                ctx.shadowColor = `rgba(180,220,255,${alpha * 0.15})`;
+                ctx.beginPath();
+                ctx.arc(x, y, 32 * s, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(200,230,255,${alpha * 0.05})`;
+                ctx.fill();
+            } else if (this.type === 'skeleton') {
+                ctx.shadowBlur = 4;
+                ctx.fillStyle = '#7a7a6a';
+                ctx.beginPath();
+                ctx.arc(x - 8 * s, y + 6 * s, 4 * s, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.beginPath();
+                ctx.arc(x + 8 * s, y + 6 * s, 4 * s, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.strokeStyle = '#6a6a5a';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(x - 10 * s, y - 22 * s);
+                ctx.lineTo(x - 2 * s, y - 28 * s);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(x + 10 * s, y - 22 * s);
+                ctx.lineTo(x + 2 * s, y - 28 * s);
+                ctx.stroke();
+            }
+            ctx.shadowBlur = 0;
+        }
+
+        hitTest(mx, my) {
+            const dx = this.x - mx, dy = this.y - my;
+            return (dx * dx + dy * dy) < (this.radius * this.radius);
+        }
+    }
+
+    // ---- Вспомогательные функции ----
+    function drawObstacles() {
+        for (const obs of obstacles) {
+            const x = obs.x, y = obs.y, w = obs.w, h = obs.h;
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = 'rgba(0,0,0,0.7)';
+            if (obs.type === 'grave') {
+                ctx.fillStyle = '#3a3a3a';
+                ctx.beginPath();
+                ctx.roundRect(x, y, w, h, 4);
+                ctx.fill();
+                ctx.fillStyle = '#4a4a4a';
+                ctx.beginPath();
+                ctx.roundRect(x + w/2 - 3, y - 10, 6, h + 10, 2);
+                ctx.fill();
+                ctx.fillStyle = '#5a5a5a';
+                ctx.beginPath();
+                ctx.roundRect(x + w/2 - 15, y - 5, 30, 6, 3);
+                ctx.fill();
+                ctx.fillStyle = '#6a6a6a';
+                ctx.font = '12px serif';
+                ctx.textAlign = 'center';
+                ctx.fillText('R.I.P.', x + w/2, y + h/2 + 4);
+            } else if (obs.type === 'tomb') {
+                ctx.fillStyle = '#5a4a3a';
+                ctx.beginPath();
+                ctx.roundRect(x, y, w, h, 6);
+                ctx.fill();
+                ctx.fillStyle = '#6a5a4a';
+                ctx.beginPath();
+                ctx.roundRect(x + 5, y - 8, w - 10, 12, 4);
+                ctx.fill();
+                ctx.fillStyle = '#4a3a2a';
+                ctx.beginPath();
+                ctx.roundRect(x + 10, y + 10, w - 20, h - 20, 3);
+                ctx.fill();
+                ctx.fillStyle = '#7a6a5a';
+                ctx.font = '14px serif';
+                ctx.textAlign = 'center';
+                ctx.fillText('🪦', x + w/2, y + h/2 + 5);
+            } else if (obs.type === 'tree') {
+                ctx.fillStyle = '#3a2a1a';
+                ctx.beginPath();
+                ctx.roundRect(x + w/2 - 4, y + h/2, 8, h/2, 2);
+                ctx.fill();
+                ctx.fillStyle = '#2a5a2a';
+                ctx.beginPath();
+                ctx.arc(x + w/2, y + h/2 - 10, w/2 + 5, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#3a6a3a';
+                ctx.beginPath();
+                ctx.arc(x + w/2 - 8, y + h/2 - 15, w/3, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#4a7a4a';
+                ctx.beginPath();
+                ctx.arc(x + w/2 + 10, y + h/2 - 12, w/3.5, 0, Math.PI * 2);
+                ctx.fill();
+            } else if (obs.type === 'wall') {
+                ctx.fillStyle = '#6a5a4a';
+                ctx.beginPath();
+                ctx.roundRect(x, y, w, h, 3);
+                ctx.fill();
+                ctx.fillStyle = '#7a6a5a';
+                for (let i = 0; i < w; i += 20) { ctx.fillRect(x + i, y, 2, h); }
+                for (let i = 0; i < h; i += 20) { ctx.fillRect(x, y + i, w, 2); }
+            } else if (obs.type === 'tower') {
+                ctx.fillStyle = '#5a4a3a';
+                ctx.beginPath();
+                ctx.roundRect(x, y, w, h, 5);
+                ctx.fill();
+                ctx.fillStyle = '#6a5a4a';
+                ctx.beginPath();
+                ctx.moveTo(x - 5, y);
+                ctx.lineTo(x + w/2, y - 15);
+                ctx.lineTo(x + w + 5, y);
+                ctx.fill();
+                for (let i = 0; i < h; i += 15) {
+                    ctx.fillStyle = '#4a3a2a';
+                    ctx.fillRect(x + 5, y + i, 5, 8);
+                    ctx.fillRect(x + w - 10, y + i, 5, 8);
+                }
+            } else if (obs.type === 'crypt') {
+                ctx.fillStyle = '#4a4a5a';
+                ctx.beginPath();
+                ctx.roundRect(x, y, w, h, 8);
+                ctx.fill();
+                ctx.fillStyle = '#5a5a6a';
+                ctx.beginPath();
+                ctx.roundRect(x + 5, y - 10, w - 10, 15, 4);
+                ctx.fill();
+                ctx.fillStyle = '#3a3a4a';
+                ctx.beginPath();
+                ctx.arc(x + w/2, y + h/2, 15, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#6a6a7a';
+                ctx.font = '16px serif';
+                ctx.textAlign = 'center';
+                ctx.fillText('⚰️', x + w/2, y + h/2 + 6);
+            }
+            ctx.shadowBlur = 0;
+        }
+    }
+
+    function drawCastle() {
+        ctx.save();
+        const x = CASTLE_X, y = CASTLE_Y;
+
+        const grad = ctx.createRadialGradient(x, y, 10, x, y, CASTLE_RADIUS + 20);
+        grad.addColorStop(0, 'rgba(255,200,100,0.15)');
+        grad.addColorStop(1, 'rgba(255,200,100,0)');
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.arc(x, y, CASTLE_RADIUS + 20, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.shadowBlur = 20;
+        ctx.shadowColor = 'rgba(0,0,0,0.5)';
+        ctx.fillStyle = '#6a5a4a';
+        ctx.beginPath();
+        ctx.roundRect(x - 35, y - 20, 70, 40, 4);
+        ctx.fill();
+
+        ctx.fillStyle = '#7a6a5a';
+        ctx.beginPath();
+        ctx.roundRect(x - 40, y - 35, 14, 20, 3);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.roundRect(x + 26, y - 35, 14, 20, 3);
+        ctx.fill();
+
+        ctx.fillStyle = '#5a3a2a';
+        ctx.beginPath();
+        ctx.moveTo(x - 45, y - 20);
+        ctx.lineTo(x, y - 55);
+        ctx.lineTo(x + 45, y - 20);
+        ctx.fill();
+
+        ctx.fillStyle = '#8a2a2a';
+        ctx.fillRect(x + 2, y - 55, 3, 20);
+        ctx.fillStyle = '#cc4444';
+        ctx.beginPath();
+        ctx.moveTo(x + 5, y - 55);
+        ctx.lineTo(x + 20, y - 48);
+        ctx.lineTo(x + 5, y - 41);
+        ctx.fill();
+
+        const barW = 50, barH = 5;
+        const bx = x - barW/2, by = y - 62;
+        const hpPercent = castleHP / CASTLE_MAX_HP;
+        ctx.fillStyle = 'rgba(0,0,0,0.7)';
+        ctx.fillRect(bx, by, barW, barH);
+        ctx.fillStyle = hpPercent > 0.5 ? '#80d080' : hpPercent > 0.25 ? '#d0a040' : '#d04040';
+        ctx.fillRect(bx, by, barW * hpPercent, barH);
+        ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(bx, by, barW, barH);
+
+        ctx.restore();
+    }
+
+    function drawEnemyCamp() {
+        if (!currentLevelData) return;
+        const cfg = getLevelConfig(currentLevelId);
+        if (!cfg) return;
+        ctx.save();
+        const cx = cfg.campX, cy = cfg.campY;
+
+        ctx.shadowBlur = 30;
+        ctx.shadowColor = 'rgba(200,50,50,0.3)';
+        ctx.fillStyle = 'rgba(200,50,50,0.05)';
+        ctx.beginPath();
+        ctx.arc(cx, cy, cfg.campRadius, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.strokeStyle = 'rgba(200,50,50,0.2)';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([6, 6]);
+        ctx.beginPath();
+        ctx.arc(cx, cy, cfg.campRadius, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        ctx.fillStyle = 'rgba(200,50,50,0.3)';
+        ctx.font = '32px serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('🏚️', cx, cy + 8);
+
+        const barW = 70, barH = 6;
+        const bx = cx - barW/2, by = cy - cfg.campRadius - 10;
+        const hpPercent = enemyCampHP / ENEMY_CAMP_MAX_HP;
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = 'rgba(0,0,0,0.7)';
+        ctx.fillRect(bx, by, barW, barH);
+        ctx.fillStyle = hpPercent > 0.5 ? '#80d080' : hpPercent > 0.25 ? '#d0a040' : '#d04040';
+        ctx.fillRect(bx, by, barW * hpPercent, barH);
+        ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(bx, by, barW, barH);
+
+        ctx.fillStyle = 'rgba(200,200,200,0.6)';
+        ctx.font = '10px sans-serif';
+        ctx.fillText(`${Math.ceil(enemyCampHP)}/${ENEMY_CAMP_MAX_HP}`, cx, by - 4);
+
+        ctx.fillStyle = 'rgba(200,50,50,0.5)';
+        ctx.font = '11px sans-serif';
+        ctx.fillText('ВРАЖЕСКИЙ ЛАГЕРЬ', cx, cy + cfg.campRadius + 25);
+        ctx.restore();
+    }
+
+    function drawBackground() {
+        const cfg = getLevelConfig(currentLevelId);
+        if (!cfg) return;
+        let grad;
+        switch (cfg.bg) {
+            case 'zombie':
+                grad = ctx.createRadialGradient(400,300,100,500,300,700);
+                grad.addColorStop(0,'#2a3a2a'); grad.addColorStop(0.5,'#1a2a1a'); grad.addColorStop(1,'#0d1a0d');
+                break;
+            case 'forest':
+                grad = ctx.createRadialGradient(300,200,80,500,300,800);
+                grad.addColorStop(0,'#2a3a1a'); grad.addColorStop(0.5,'#1a2a0d'); grad.addColorStop(1,'#0d1a08');
+                break;
+            case 'castle':
+                grad = ctx.createRadialGradient(500,300,100,500,300,700);
+                grad.addColorStop(0,'#3a2a2a'); grad.addColorStop(0.5,'#2a1a1a'); grad.addColorStop(1,'#1a0d0d');
+                break;
+            case 'crypt':
+                grad = ctx.createRadialGradient(400,250,80,500,300,750);
+                grad.addColorStop(0,'#2a2a3a'); grad.addColorStop(0.5,'#1a1a2a'); grad.addColorStop(1,'#0d0d1a');
+                break;
+            default:
+                grad = ctx.createRadialGradient(400,300,100,500,300,700);
+                grad.addColorStop(0,'#2d3a44'); grad.addColorStop(0.5,'#1e2933'); grad.addColorStop(1,'#131a22');
+        }
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        ctx.strokeStyle = 'rgba(53,69,82,0.15)';
+        ctx.lineWidth = 0.5;
+        for (let i = 0; i < canvas.width; i += 50) { ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i+30,canvas.height); ctx.stroke(); }
+        for (let i = 0; i < canvas.height; i += 50) { ctx.beginPath(); ctx.moveTo(0,i); ctx.lineTo(canvas.width,i+20); ctx.stroke(); }
+    }
+
+    function createUnitOfType(type, campX, campY, isAlly = false) {
+        let x, y, attempts = 0;
+        do {
+            const angle = Math.random() * 2 * Math.PI;
+            const dist = isAlly ? 20 + Math.random() * 40 : 20 + Math.random() * 50;
+            x = isAlly ? CASTLE_X + Math.cos(angle) * dist : campX + Math.cos(angle) * dist;
+            y = isAlly ? CASTLE_Y + Math.sin(angle) * dist : campY + Math.sin(angle) * dist;
+            attempts++;
+        } while (attempts < 30 && isInsideObstacle(x, y));
+        const unit = new Unit(x, y, type, campX, campY, isAlly);
+        if (isAlly) {
+            unit.marchTargetX = campX;
+            unit.marchTargetY = campY;
+            unit.maxHp = type === 'sniper' ? 8 : type === 'bishop' ? 10 : type === 'druid' ? 10 : 12;
+            unit.hp = unit.maxHp;
+        }
+        return unit;
+    }
+
+    function isInsideObstacle(x, y) {
+        const margin = 18;
+        for (const obs of obstacles) {
+            if (x > obs.x - margin && x < obs.x + obs.w + margin &&
+                y > obs.y - margin && y < obs.y + obs.h + margin) return true;
+        }
+        if (Math.hypot(x - CASTLE_X, y - CASTLE_Y) < CASTLE_RADIUS + 20) return true;
+        return false;
+    }
+
+    function spawnEnemiesForLevel(levelId) {
+        const cfg = getLevelConfig(levelId);
+        if (!cfg) return;
+        enemies = [];
+        const enemyTypes = cfg.allowedTypes || ['zombie'];
+        for (let i = 0; i < cfg.initialCount; i++) {
+            const type = enemyTypes[Math.floor(Math.random() * enemyTypes.length)];
+            const e = createUnitOfType(type, cfg.campX, cfg.campY, false);
+            enemies.push(e);
+            allUnits.push(e);
+        }
+        enemyCampHP = ENEMY_CAMP_MAX_HP;
+    }
+
+    function spawnMoreEnemies() {
+        if (!currentLevelId || gameOverFlag || victoryFlag) return;
+        const cfg = getLevelConfig(currentLevelId);
+        if (!cfg) return;
+        const enemyCount = enemies.filter(e => e.hp > 0).length;
+        if (enemyCount >= cfg.maxUnits) return;
+        const canAdd = Math.min(1, cfg.maxUnits - enemyCount);
+        const enemyTypes = cfg.allowedTypes || ['zombie'];
+        for (let i = 0; i < canAdd; i++) {
+            const type = enemyTypes[Math.floor(Math.random() * enemyTypes.length)];
+            const e = createUnitOfType(type, cfg.campX, cfg.campY, false);
+            enemies.push(e);
+            allUnits.push(e);
+        }
+    }
+
+    function startAutoSpawn() {
+        if (spawnIntervalId) clearInterval(spawnIntervalId);
+        const cfg = getLevelConfig(currentLevelId);
+        spawnIntervalId = setInterval(spawnMoreEnemies, cfg ? cfg.spawnRate : 4000);
+    }
+
+    function startCleanup() {
+        if (cleanIntervalId) clearInterval(cleanIntervalId);
+        cleanIntervalId = setInterval(() => {
+            allUnits = allUnits.filter(u => u.hp > 0);
+            enemies = enemies.filter(e => e.hp > 0);
+            allies = allies.filter(a => a.hp > 0);
+            updateHUD();
+        }, 3000);
+    }
+
+    function addAnimation(x, y, type, color = '#ffdd88') {
+        animations.push({ x, y, type, life: 25, maxLife: 25, color });
+    }
+
+    // ---- Система миссий ----
+    function initMission(levelId) {
+        const data = ALL_LEVELS[levelId];
+        if (!data || !data.mission) return;
+
+        missionProgress = { kills: 0, hired: {} };
+        missionCompleted = false;
+        currentMissionType = data.mission.type;
+        currentMissionData = data.mission;
+
+        if (data.mission.type === 'kill_enemies') {
+            missionProgress.kills = 0;
+        } else if (data.mission.type === 'hire_units') {
+            missionProgress.hired = {};
+            for (const type in data.mission.hire) {
+                missionProgress.hired[type] = 0;
+            }
+        } else if (data.mission.type === 'hire_and_kill') {
+            missionProgress.hired = {};
+            if (data.mission.hire) {
+                for (const type in data.mission.hire) {
+                    missionProgress.hired[type] = 0;
+                }
+            }
+            missionProgress.kills = 0;
+        }
+
+        updateMissionUI();
+        missionInfo.classList.add('visible');
+        document.getElementById('missionCounter').style.display = 'block';
+    }
+
+    function updateMissionProgress(action, type) {
+        if (missionCompleted || !currentMissionData) return;
+
+        if (action === 'kill') {
+            if (currentMissionData.type === 'kill_enemies') {
+                if (!currentMissionData.enemyTypes || currentMissionData.enemyTypes.includes(type)) {
+                    missionProgress.kills++;
+                }
+            } else if (currentMissionData.type === 'hire_and_kill') {
+                if (currentMissionData.kill) {
+                    if (currentMissionData.kill.total) {
+                        missionProgress.kills++;
+                    } else if (currentMissionData.kill[type]) {
+                        missionProgress.kills++;
+                    }
+                }
+            }
+        } else if (action === 'hire') {
+            if (currentMissionData.type === 'hire_units' || currentMissionData.type === 'hire_and_kill') {
+                if (currentMissionData.hire && currentMissionData.hire[type]) {
+                    missionProgress.hired[type] = (missionProgress.hired[type] || 0) + 1;
+                }
+            }
+        }
+
+        updateMissionUI();
+        checkMission();
+    }
+
+    function checkMission() {
+        if (missionCompleted || !currentMissionData || gameOverFlag || victoryFlag) return;
+
+        let complete = false;
+
+        if (currentMissionData.type === 'kill_enemies') {
+            complete = missionProgress.kills >= currentMissionData.target;
+        } else if (currentMissionData.type === 'hire_units') {
+            let allHired = true;
+            for (const type in currentMissionData.hire) {
+                if ((missionProgress.hired[type] || 0) < currentMissionData.hire[type]) {
+                    allHired = false;
+                    break;
+                }
+            }
+            complete = allHired;
+        } else if (currentMissionData.type === 'hire_and_kill') {
+            let allHired = true;
+            if (currentMissionData.hire) {
+                for (const type in currentMissionData.hire) {
+                    if ((missionProgress.hired[type] || 0) < currentMissionData.hire[type]) {
+                        allHired = false;
+                        break;
+                    }
+                }
+            }
+            let killsDone = true;
+            if (currentMissionData.kill) {
+                if (currentMissionData.kill.total) {
+                    killsDone = missionProgress.kills >= currentMissionData.kill.total;
+                } else {
+                    for (const type in currentMissionData.kill) {
+                        killsDone = missionProgress.kills >= currentMissionData.kill[type];
+                        break;
+                    }
+                }
+            }
+            complete = allHired && killsDone;
+        }
+
+        if (complete) {
+            missionCompleted = true;
+            completedLevels.add(currentLevelId);
+            triggerVictory('Задание выполнено!');
+        }
+
+        updateMissionUI();
+    }
+
+    function updateMissionUI() {
+        if (!currentMissionData) return;
+
+        let progressText = '';
+        let total = 0;
+        let done = 0;
+
+        if (currentMissionData.type === 'kill_enemies') {
+            total = currentMissionData.target;
+            done = missionProgress.kills;
+            progressText = `Убито: ${done}/${total}`;
+        } else if (currentMissionData.type === 'hire_units') {
+            let parts = [];
+            for (const type in currentMissionData.hire) {
+                const target = currentMissionData.hire[type];
+                const current = missionProgress.hired[type] || 0;
+                parts.push(`${getUnitDisplayName(type)}: ${current}/${target}`);
+                total += target;
+                done += Math.min(current, target);
+            }
+            progressText = parts.join(' | ');
+        } else if (currentMissionData.type === 'hire_and_kill') {
+            let parts = [];
+            if (currentMissionData.hire) {
+                for (const type in currentMissionData.hire) {
+                    const target = currentMissionData.hire[type];
+                    const current = missionProgress.hired[type] || 0;
+                    parts.push(`${getUnitDisplayName(type)}: ${current}/${target}`);
+                    total += target;
+                    done += Math.min(current, target);
+                }
+            }
+            if (currentMissionData.kill) {
+                let killTarget = 0;
+                if (currentMissionData.kill.total) {
+                    killTarget = currentMissionData.kill.total;
+                } else {
+                    for (const type in currentMissionData.kill) {
+                        killTarget = currentMissionData.kill[type];
+                        break;
+                    }
+                }
+                parts.push(`Убито: ${missionProgress.kills}/${killTarget}`);
+                total += killTarget;
+                done += Math.min(missionProgress.kills, killTarget);
+            }
+            progressText = parts.join(' | ');
+        }
+
+        const percent = total > 0 ? Math.round(done / total * 100) : 0;
+        missionTitle.textContent = getLevelDisplayName(currentLevelId);
+        missionProgressText.textContent = progressText;
+        missionProgressText.className = 'progress' + (missionCompleted ? ' done' : '');
+        missionProgressEl.textContent = `${percent}%`;
+
+        const failCond = currentLevelData ? currentLevelData.failCondition : '';
+        missionFailCondition.textContent = '⚠️ ' + (failCond || 'Не дайте врагам уничтожить замок');
+    }
+
+    function getUnitDisplayName(type) {
+        const map = {
+            'swordsman': 'Мечник',
+            'sniper': 'Снайпер',
+            'bishop': 'Епископ',
+            'druid': 'Друид',
+            'zombie': 'Зомби',
+            'vampire': 'Вампир',
+            'werewolf': 'Оборотень',
+            'ghost': 'Призрак',
+            'skeleton': 'Скелет'
+        };
+        return map[type] || type;
+    }
+
+    function getLevelDisplayName(id) {
+        const data = ALL_LEVELS[id];
+        return data ? `${data.icon} ${data.name}` : id;
+    }
+
+    // ---- Система найма ----
+    function getHireConfigs() {
+        return [
+            { id: 'swordsman', icon: '⚔️', label: 'Мечник', desc: 'воин с мечом и щитом', cost: 15, cooldown: 20,
+                hire: () => {
+                    if (gold < 15) return false;
+                    gold -= 15;
+                    const ally = createUnitOfType('swordsman', CASTLE_X, CASTLE_Y, true);
+                    allies.push(ally);
+                    allUnits.push(ally);
+                    addAnimation(ally.x, ally.y - 20, 'heal', '#88ddff');
+                    updateHUD();
+                    updateMissionProgress('hire', 'swordsman');
+                    checkMission();
+                    return true;
+                } },
+            { id: 'sniper', icon: '🔫', label: 'Гном-снайпер', desc: 'маленький гном с бластером', cost: 20, cooldown: 28,
+                hire: () => {
+                    if (gold < 20) return false;
+                    gold -= 20;
+                    const ally = createUnitOfType('sniper', CASTLE_X, CASTLE_Y, true);
+                    allies.push(ally);
+                    allUnits.push(ally);
+                    addAnimation(ally.x, ally.y - 20, 'heal', '#88ddff');
+                    updateHUD();
+                    updateMissionProgress('hire', 'sniper');
+                    checkMission();
+                    return true;
+                } },
+            { id: 'bishop', icon: '⛪', label: 'Епископ', desc: 'лечит союзников', cost: 18, cooldown: 32,
+                hire: () => {
+                    if (gold < 18) return false;
+                    gold -= 18;
+                    const ally = createUnitOfType('bishop', CASTLE_X, CASTLE_Y, true);
+                    allies.push(ally);
+                    allUnits.push(ally);
+                    addAnimation(ally.x, ally.y - 20, 'heal', '#88ddff');
+                    updateHUD();
+                    updateMissionProgress('hire', 'bishop');
+                    checkMission();
+                    return true;
+                } },
+            { id: 'druid', icon: '🌿', label: 'Эльф-друид', desc: 'обездвиживает корнями', cost: 22, cooldown: 35,
+                hire: () => {
+                    if (gold < 22) return false;
+                    gold -= 22;
+                    const ally = createUnitOfType('druid', CASTLE_X, CASTLE_Y, true);
+                    allies.push(ally);
+                    allUnits.push(ally);
+                    addAnimation(ally.x, ally.y - 20, 'heal', '#88ddff');
+                    updateHUD();
+                    updateMissionProgress('hire', 'druid');
+                    checkMission();
+                    return true;
+                } }
+        ];
+    }
+
+    function buildSpellPanel() {
+        const configs = getHireConfigs();
+        spellConfigs = configs;
+        spellPanel.innerHTML = '';
+        cooldowns = {};
+        COOLDOWN_MAX = {};
+        configs.forEach((spell, index) => {
+            cooldowns[spell.id] = 0;
+            COOLDOWN_MAX[spell.id] = spell.cooldown;
+            const btn = document.createElement('div');
+            btn.className = 'spell-btn ready';
+            btn.dataset.spell = spell.id;
+            btn.innerHTML = `
+                <span class="keybind">${index + 1}</span>
+                <span class="icon">${spell.icon}</span>
+                <span class="cost-badge">🪙${spell.cost}</span>
+                <span class="border-glow"></span>
+                <span class="cooldown-overlay" id="cd_${spell.id}">✓</span>
+                <div class="tooltip"><div class="name">${spell.label}</div><div class="desc">${spell.desc}</div><div class="cost">🪙 ${spell.cost}</div></div>
+            `;
+            spellPanel.appendChild(btn);
+            btn.addEventListener('click', () => hireUnit(spell.id));
+        });
+        document.removeEventListener('keydown', keyHandler);
+        document.addEventListener('keydown', keyHandler);
+    }
+
+    function keyHandler(e) {
+        if (!gameStarted || gameOverFlag || victoryFlag) return;
+        const idx = parseInt(e.key) - 1;
+        if (idx >= 0 && idx < spellConfigs.length) {
+            hireUnit(spellConfigs[idx].id);
+        }
+    }
+
+    function hireUnit(spellId) {
+        if (cooldowns[spellId] > 0 || gameOverFlag || victoryFlag) return;
+        const spell = spellConfigs.find(s => s.id === spellId);
+        if (!spell) return;
+        const success = spell.hire();
+        if (!success) {
+            const btn = document.querySelector(`[data-spell="${spellId}"]`);
+            if (btn) { btn.style.borderColor = '#ff4444'; setTimeout(() => btn.style.borderColor = '', 400); }
+            return;
+        }
+        cooldowns[spellId] = COOLDOWN_MAX[spellId];
+        const btn = document.querySelector(`[data-spell="${spellId}"]`);
+        const overlay = document.getElementById(`cd_${spellId}`);
+        if (btn) btn.disabled = true;
+        if (overlay) { overlay.textContent = '⌛'; overlay.classList.add('active'); }
+        setTimeout(() => {
+            if (btn) btn.disabled = false;
+            if (overlay) { overlay.textContent = '✓'; overlay.classList.remove('active'); }
+        }, COOLDOWN_MAX[spellId] * 16);
+        updateHUD();
+    }
+
+    function updateHUD() {
+        goldDisplay.textContent = gold;
+        allyCountEl.textContent = allies.filter(a => a.hp > 0).length;
+    }
+
+    function updateTargetUI() {
+        if (selectedUnit && (allUnits.includes(selectedUnit))) {
+            targetInfo.classList.add('visible');
+            targetPortrait.classList.add('visible');
+            const u = selectedUnit;
+            targetName.textContent = u.getTypeName ? u.getTypeName() : u.type;
+            targetHp.textContent = `HP: ${u.hp}/${u.maxHp}`;
+            targetHp.className = 'target-hp' + (u.hp/u.maxHp < 0.3 ? ' low' : '');
+            targetPortrait.textContent = u.portrait;
+        } else {
+            targetInfo.classList.remove('visible');
+            targetPortrait.classList.remove('visible');
+            selectedUnit = null;
+        }
+    }
+
+    function updateCastleHUD() {
+        castleHpEl.textContent = `HP: ${castleHP}/${CASTLE_MAX_HP}`;
+        castleHpEl.className = 'castle-hp' + (castleHP/CASTLE_MAX_HP < 0.3 ? ' low' : '');
+    }
+
+    function triggerGameOver(reason) {
+        if (gameOverFlag || victoryFlag) return;
+        gameOverFlag = true;
+        gameStarted = false;
+        if (spawnIntervalId) clearInterval(spawnIntervalId);
+        if (cleanIntervalId) clearInterval(cleanIntervalId);
+        gameOverReason.textContent = reason || 'Ваши войска пали...';
+        gameOverEl.style.display = 'flex';
+    }
+
+    function triggerVictory(message) {
+        if (victoryFlag || gameOverFlag) return;
+        victoryFlag = true;
+        gameStarted = false;
+        if (spawnIntervalId) clearInterval(spawnIntervalId);
+        if (cleanIntervalId) clearInterval(cleanIntervalId);
+        victoryMessage.textContent = message || 'Задание выполнено!';
+        victoryEl.style.display = 'flex';
+        completedLevels.add(currentLevelId);
+        updateLevelMenu();
+    }
+
+    // ---- Меню уровней ----
+    function buildLevelMenu() {
+        levelGrid.innerHTML = '';
+        const orderedIds = ['forest_graves', 'vampire_county', 'blood_moon', 'crusade',
+                           'skeleton_horde', 'vampire_nest', 'werewolf_pack', 'ghost_manor',
+                           'undead_army', 'dark_castle', 'plague_lands', 'cursed_forest', 'final_battle'];
+
+        const available = orderedIds.filter(id => ALL_LEVELS[id]);
+
+        available.forEach((id, index) => {
+            const data = ALL_LEVELS[id];
+            if (!data) return;
+
+            const isLocked = data.unlock && !completedLevels.has(data.unlock);
+            const isCompleted = completedLevels.has(id);
+
+            const btn = document.createElement('div');
+            btn.className = 'level-btn' + (isLocked ? ' locked' : '');
+            btn.innerHTML = `
+                <span class="icon">${data.icon}</span>
+                <strong>${data.name}</strong>
+                <small>${data.description}</small>
+                <span class="goal">🎯 ${getMissionDescription(data.mission)}</span>
+                ${isLocked ? '<span class="locked-icon">🔒</span>' : ''}
+                ${isCompleted ? '<span class="completed">✅</span>' : ''}
+                ${!isLocked && !isCompleted ? '<span class="goal">▶ Начать</span>' : ''}
+            `;
+            if (!isLocked) {
+                btn.addEventListener('click', () => startGame(id));
+            }
+            levelGrid.appendChild(btn);
+        });
+    }
+
+    function getMissionDescription(mission) {
+        if (!mission) return 'Нет задания';
+        if (mission.type === 'kill_enemies') {
+            const types = mission.enemyTypes ? mission.enemyTypes.map(t => getUnitDisplayName(t)).join(', ') : 'врагов';
+            return `Убить ${mission.target} ${types}`;
+        } else if (mission.type === 'hire_units') {
+            const parts = [];
+            for (const type in mission.hire) {
+                parts.push(`${mission.hire[type]} ${getUnitDisplayName(type)}`);
+            }
+            return `Нанять ${parts.join(' и ')}`;
+        } else if (mission.type === 'hire_and_kill') {
+            const parts = [];
+            if (mission.hire) {
+                for (const type in mission.hire) {
+                    parts.push(`${mission.hire[type]} ${getUnitDisplayName(type)}`);
+                }
+            }
+            if (mission.kill) {
+                if (mission.kill.total) {
+                    parts.push(`убить ${mission.kill.total} врагов`);
+                } else {
+                    for (const type in mission.kill) {
+                        parts.push(`убить ${mission.kill[type]} ${getUnitDisplayName(type)}`);
+                        break;
+                    }
+                }
+            }
+            return parts.join(' и ');
+        }
+        return 'Выполните задание';
+    }
+
+    function updateLevelMenu() {
+        buildLevelMenu();
+    }
+
+    // ---- Игровой цикл ----
+    function gameLoop() {
+        for (let key in cooldowns) {
+            if (cooldowns[key] > 0) {
+                cooldowns[key]--;
+                const overlay = document.getElementById(`cd_${key}`);
+                if (overlay && cooldowns[key] > 0) {
+                    const secs = Math.ceil(cooldowns[key] / 20);
+                    overlay.textContent = secs + 'с';
+                }
+            } else {
+                const overlay = document.getElementById(`cd_${key}`);
+                if (overlay && overlay.classList.contains('active')) {
+                    overlay.textContent = '✓';
+                    overlay.classList.remove('active');
+                    const btn = document.querySelector(`[data-spell="${key}"]`);
+                    if (btn) btn.disabled = false;
+                }
+            }
+        }
+
+        animations = animations.filter(a => { a.life--; return a.life > 0; });
+
+        for (const u of allUnits) {
+            u.update(canvas.width, canvas.height);
+        }
+
+        allUnits = allUnits.filter(u => u.hp > 0);
+        enemies = enemies.filter(e => e.hp > 0);
+        allies = allies.filter(a => a.hp > 0);
+
+        if (!victoryFlag && !gameOverFlag && gameStarted) {
+            checkMission();
+        }
+
+        drawBackground();
+        drawObstacles();
+        drawEnemyCamp();
+        drawCastle();
+        allUnits.forEach(u => u.draw(ctx));
+
+        // Анимации
+        for (const a of animations) {
+            const progress = 1 - a.life / a.maxLife;
+            const alpha = 1 - progress;
+            ctx.save();
+            ctx.globalAlpha = alpha;
+            if (a.type === 'heal') {
+                ctx.shadowBlur = 20;
+                ctx.shadowColor = a.color;
+                ctx.fillStyle = a.color;
+                ctx.beginPath();
+                ctx.arc(a.x, a.y - progress * 20, 8 + progress * 12, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.font = '18px sans-serif';
+                ctx.fillStyle = '#fff';
+                ctx.shadowBlur = 10;
+                ctx.fillText('+', a.x - 5, a.y - progress * 30 + 5);
+            } else if (a.type === 'damage' || a.type === 'camp_damage') {
+                ctx.shadowBlur = 25;
+                ctx.shadowColor = '#ff4444';
+                ctx.fillStyle = '#ff4444';
+                ctx.beginPath();
+                ctx.arc(a.x + (Math.random()-0.5)*10, a.y - progress*30 + (Math.random()-0.5)*10, 6 + progress*10, 0, Math.PI*2);
+                ctx.fill();
+                ctx.font = '20px sans-serif';
+                ctx.fillStyle = '#ff8888';
+                ctx.shadowBlur = 15;
+                ctx.fillText('💥', a.x - 12, a.y - progress * 40);
+            } else if (a.type === 'explosion') {
+                ctx.shadowBlur = 40;
+                ctx.shadowColor = '#ff6600';
+                const r = 10 + progress * 30;
+                const grad = ctx.createRadialGradient(a.x, a.y, 0, a.x, a.y, r);
+                grad.addColorStop(0, 'rgba(255,200,100,0.8)');
+                grad.addColorStop(0.5, 'rgba(255,100,50,0.5)');
+                grad.addColorStop(1, 'rgba(255,50,0,0)');
+                ctx.fillStyle = grad;
+                ctx.beginPath();
+                ctx.arc(a.x, a.y, r, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#ff8844';
+                ctx.font = '18px sans-serif';
+                ctx.fillText('💥', a.x - 10, a.y + 6);
+            } else if (a.type === 'root') {
+                ctx.shadowBlur = 20;
+                ctx.shadowColor = '#44dd88';
+                ctx.strokeStyle = '#44dd88';
+                ctx.lineWidth = 3;
+                for (let i = 0; i < 6; i++) {
+                    const ang = i / 6 * Math.PI * 2 + progress * 0.5;
+                    ctx.beginPath();
+                    ctx.moveTo(a.x, a.y);
+                    ctx.lineTo(a.x + Math.cos(ang) * (20 + progress*30), a.y + Math.sin(ang) * (20 + progress*30));
+                    ctx.stroke();
+                }
+                ctx.fillStyle = 'rgba(68,221,136,0.2)';
+                ctx.beginPath();
+                ctx.arc(a.x, a.y, 20 + progress*30, 0, Math.PI*2);
+                ctx.fill();
+            } else if (a.type === 'shot') {
+                ctx.shadowBlur = 30;
+                ctx.shadowColor = '#ffaa44';
+                ctx.fillStyle = '#ffaa44';
+                for (let i = 0; i < 5; i++) {
+                    const ang = Math.random() * Math.PI * 2;
+                    const r = 8 + Math.random() * 20 * progress;
+                    ctx.beginPath();
+                    ctx.arc(a.x + Math.cos(ang) * r, a.y + Math.sin(ang) * r, 3 + progress * 4, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            } else if (a.type === 'red_shot') {
+                ctx.shadowBlur = 40;
+                ctx.shadowColor = '#ff0000';
+                ctx.fillStyle = 'rgba(255,0,0,0.3)';
+                ctx.beginPath();
+                ctx.arc(a.x, a.y, 15 + progress * 25, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = 'rgba(255,50,50,0.5)';
+                ctx.beginPath();
+                ctx.arc(a.x, a.y, 8 + progress * 15, 0, Math.PI * 2);
+                ctx.fill();
+            } else if (a.type === 'slash') {
+                ctx.shadowBlur = 20;
+                ctx.shadowColor = '#ff6644';
+                ctx.strokeStyle = '#ff6644';
+                ctx.lineWidth = 3;
+                const r = 20 + progress * 20;
+                ctx.beginPath();
+                ctx.arc(a.x, a.y, r, -0.5 + progress * 1.5, 0.5 + progress * 1.5);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.arc(a.x, a.y, r * 0.7, -0.3 + progress * 1.2, 0.3 + progress * 1.2);
+                ctx.stroke();
+            } else if (a.type === 'holy') {
+                ctx.shadowBlur = 30;
+                ctx.shadowColor = '#ffaa88';
+                ctx.fillStyle = 'rgba(255,170,136,0.3)';
+                ctx.beginPath();
+                ctx.arc(a.x, a.y, 15 + progress * 25, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#ffdd88';
+                ctx.font = '20px sans-serif';
+                ctx.fillText('✦', a.x - 8, a.y + 6);
+            }
+            ctx.restore();
+        }
+
+        if (selectedUnit && allUnits.includes(selectedUnit)) {
+            ctx.save();
+            ctx.strokeStyle = '#f0d080';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([5, 5]);
+            ctx.beginPath();
+            ctx.arc(selectedUnit.x, selectedUnit.y, selectedUnit.radius + 4, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.restore();
+            const barW = 30, barH = 4;
+            const bx = selectedUnit.x - barW/2, by = selectedUnit.y - selectedUnit.radius - 8;
+            const hpPercent = selectedUnit.hp / selectedUnit.maxHp;
+            ctx.fillStyle = 'rgba(0,0,0,0.6)';
+            ctx.fillRect(bx, by, barW, barH);
+            ctx.fillStyle = hpPercent > 0.5 ? '#80d080' : '#d08040';
+            ctx.fillRect(bx, by, barW * hpPercent, barH);
+        }
+
+        requestAnimationFrame(gameLoop);
+    }
+
+    // ---- Старт игры ----
+    function startGame(levelId) {
+        const data = ALL_LEVELS[levelId];
+        if (!data) return;
+
+        currentLevelId = levelId;
+        currentLevelData = data;
+
+        const cfg = getLevelConfig(levelId);
+        if (!cfg) return;
+
+        castleHP = data.castleHP || 30;
+        gold = data.initialGold || 50;
+
+        gameStarted = true;
+        gameOverFlag = false;
+        victoryFlag = false;
+        missionCompleted = false;
+
+        gameOverEl.style.display = 'none';
+        victoryEl.style.display = 'none';
+        levelMenu.style.display = 'none';
+
+        obstacles = cfg.obstacles || [];
+        spellPanel.classList.remove('hidden');
+        castleHud.classList.add('visible');
+        missionInfo.classList.add('visible');
+        document.getElementById('missionCounter').style.display = 'block';
+
+        updateCastleHUD();
+        selectedUnit = null;
+        updateTargetUI();
+
+        allUnits = [];
+        enemies = [];
+        allies = [];
+
+        spawnEnemiesForLevel(levelId);
+        if (spawnIntervalId) clearInterval(spawnIntervalId);
+        if (cleanIntervalId) clearInterval(cleanIntervalId);
+        startAutoSpawn();
+        startCleanup();
+        animations = [];
+        for (let key in cooldowns) cooldowns[key] = 0;
+        document.querySelectorAll('.cooldown-overlay').forEach(el => {
+            el.textContent = '✓';
+            el.classList.remove('active');
+        });
+        document.querySelectorAll('.spell-btn').forEach(b => b.disabled = false);
+
+        initMission(levelId);
+
+        updateHUD();
+        updateCastleHUD();
+    }
+
+    // ---- Сброс игры ----
+    function resetGame() {
+        gameOverEl.style.display = 'none';
+        victoryEl.style.display = 'none';
+        levelMenu.style.display = 'flex';
+        spellPanel.classList.add('hidden');
+        castleHud.classList.remove('visible');
+        missionInfo.classList.remove('visible');
+        document.getElementById('missionCounter').style.display = 'none';
+
+        gameStarted = false;
+        gameOverFlag = false;
+        victoryFlag = false;
+        missionCompleted = false;
+
+        allUnits = [];
+        enemies = [];
+        allies = [];
+        selectedUnit = null;
+        updateTargetUI();
+
+        if (spawnIntervalId) clearInterval(spawnIntervalId);
+        if (cleanIntervalId) clearInterval(cleanIntervalId);
+
+        castleHP = 30;
+        gold = 50;
+        updateCastleHUD();
+        updateHUD();
+
+        currentLevelId = null;
+        currentLevelData = null;
+
+        updateLevelMenu();
+    }
+
+    function nextLevel() {
+        const data = ALL_LEVELS[currentLevelId];
+        if (data && data.next && ALL_LEVELS[data.next]) {
+            const nextData = ALL_LEVELS[data.next];
+            if (nextData.unlock && !completedLevels.has(nextData.unlock)) {
+                resetGame();
+                return;
+            }
+            startGame(data.next);
+        } else {
+            resetGame();
+        }
+    }
+
+    // ---- Инициализация ----
+    restartBtn.addEventListener('click', resetGame);
+    victoryRestartBtn.addEventListener('click', nextLevel);
+
+    canvas.addEventListener('click', (e) => {
+        if (!gameStarted || gameOverFlag || victoryFlag) return;
+        const rect = canvas.getBoundingClientRect();
+        const scaleX = canvas.width / rect.width;
+        const scaleY = canvas.height / rect.height;
+        const mx = (e.clientX - rect.left) * scaleX;
+        const my = (e.clientY - rect.top) * scaleY;
+        let found = null;
+        for (let i = allUnits.length - 1; i >= 0; i--) {
+            if (allUnits[i].hitTest(mx, my)) { found = allUnits[i]; break; }
+        }
+        selectedUnit = found || null;
+        updateTargetUI();
+    });
+
+    buildSpellPanel();
+    buildLevelMenu();
+    gameLoop();
+
+    console.log('Некро-RTS: Кампания с заданиями!');
+})();
+</script>
+</body>
+</html>
